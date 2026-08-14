@@ -209,6 +209,43 @@ runs on Node's standard library alone — no packages, no `node_modules`, no
 install step. That's what makes it reasonable to drop into a Go or PHP repo:
 checking the docs costs nothing; only building the human-facing site does.
 
+## Development
+
+```bash
+git clone https://github.com/glauberborges/wiki-kit.git
+cd wiki-kit
+npm install
+npm run build
+npm test
+```
+
+- `npm run build` — compiles `src/` to `dist/`. Required before running the
+  CLI itself: `bin/cli.js` imports the compiled `dist/cli.js`, not `src/`
+  directly.
+- `npm run lint` — typecheck only (`tsc --noEmit`), no output written.
+- `npm test` — runs the Vitest suite. Tests import from `src/` directly and
+  are transformed on the fly, so **no build is needed to run tests** — only
+  to run the CLI.
+
+To try the CLI against your own changes without publishing anything, rebuild
+and run `bin/cli.js` directly:
+
+```bash
+npm run build && node bin/cli.js lint
+```
+
+Or link it once so `wiki-kit` resolves to this checkout globally, and just
+rebuild between runs:
+
+```bash
+npm link                          # one-time
+npm run build && wiki-kit lint    # after every change — same as a real install
+npm unlink -g @glauberborges/wiki-kit   # when you're done
+```
+
+There's no watch mode — rebuild (`npm run build`) after touching anything
+under `src/` before re-running the CLI.
+
 ## Status
 
 v1, ported and packaged from a reference implementation that's been running
