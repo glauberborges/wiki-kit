@@ -1,8 +1,3 @@
-// ponytail: this toolchain's tsc doesn't auto-include @types/node without an
-// explicit reference (root tsconfig.json has no `types` field to avoid
-// forcing that on every module) — scoped here instead of touching the
-// shared config.
-/// <reference types="node" />
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
