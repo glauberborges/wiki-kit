@@ -1,0 +1,11 @@
+rules:
+  sources-present: { severity: error, apply-to: [architecture, reference] }
+  staleness:       { severity: warn }
+  unverified:      { severity: warn }
+  workspace-absorbed: { severity: warn }
+okf:
+  types: [Architecture, Guide, Reference, Runbook, Concept]
+output:
+  dir: static
+  artifacts: [llms, llms-full, map, okf]
+  llms-max-kb: 8

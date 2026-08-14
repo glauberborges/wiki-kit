@@ -1,0 +1,122 @@
+// Wiki — docs lint and site build, on Jenkins.
+//
+// Equivalent to .github/workflows/wiki.yml. Use ONE or the other depending on the
+// repository; the verified command is the same in both, so behavior doesn't diverge.
+//
+// HOW TO USE
+//   a) Repo with only Jenkins: rename this to `Jenkinsfile` (or point the job at
+//      this path) and delete the GitHub Actions workflow.
+//   b) A Jenkinsfile already exists: copy the `Wiki lint` and `Docs in sync` stages
+//      into it.
+//
+// PREREQUISITES
+//   - Multibranch Pipeline (or Branch Source): this is what sets CHANGE_TARGET on
+//     PR builds. Without it, the gate doesn't know what to compare against — export
+//     WIKI_BASE on the job instead.
+//   - Node 20+ on the agent. Below via a Docker agent; if you prefer the NodeJS
+//     plugin, swap for `agent any` + `tools { nodejs 'node-24' }`.
+
+pipeline {
+    // The lint doesn't need npm install or node_modules — only the Node binary
+    // (npx fetches wiki-kit itself). That's why the slim image is enough and the
+    // stage costs seconds.
+    agent {
+        docker {
+            image 'node:24-alpine'
+            args '-u root:root'
+            reuseNode true
+        }
+    }
+
+    options {
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds(abortPrevious: true)
+    }
+
+    stages {
+        stage('History') {
+            // Staleness and `--affected` compare commits. Many Jenkins agents
+            // clone shallow (only the build's branch, depth 1), so the base
+            // branch might not even exist locally. Without this stage the gate
+            // would fail saying the base ref doesn't exist — which is the
+            // correct behavior, but better to bring in the history and verify.
+            when { expression { env.CHANGE_TARGET } }
+            steps {
+                sh '''
+                    set -eu
+                    apk add --no-cache git >/dev/null 2>&1 || true
+                    git config --global --add safe.directory "$PWD"
+                    git fetch --no-tags --depth=200 origin \
+                        "+refs/heads/${CHANGE_TARGET}:refs/remotes/origin/${CHANGE_TARGET}"
+                '''
+            }
+        }
+
+        stage('Wiki lint') {
+            // Front matter, missing source, staleness, broken link.
+            // Runs on every build, including branch builds.
+            steps {
+                sh 'npx -y @glauberborges/wiki-kit lint'
+            }
+        }
+
+        stage('Docs in sync with the code') {
+            // The gate: code changed and the page declaring it as a source didn't.
+            // PR only — a branch build has no base to compare against.
+            //
+            // The base is resolved automatically from CHANGE_TARGET (wiki-kit
+            // knows the env vars for Jenkins, GitHub Actions, GitLab, and
+            // Bitbucket), so there's no need to pass --base here.
+            when { expression { env.CHANGE_TARGET } }
+            steps {
+                sh 'npx -y @glauberborges/wiki-kit affected --strict'
+            }
+        }
+
+        stage('Build the site') {
+            // The only stage that needs npm install. This is where Docusaurus's
+            // `onBrokenLinks: throw` actually fails the build.
+            when {
+                anyOf {
+                    changeset 'wiki/**'
+                    branch 'main'
+                    branch 'master'
+                }
+            }
+            steps {
+                sh '''
+                    set -eu
+                    npx -y @glauberborges/wiki-kit llms
+                    npm --prefix wiki ci --no-audit --no-fund
+                    npm --prefix wiki run build
+                '''
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: 'wiki/build/**', allowEmptyArchive: true, fingerprint: false
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo 'Docs stale? Run locally: make -C wiki ingest-prompt'
+        }
+    }
+}
+
+// NOTES
+//
+// Shallow clone and depth. `--depth=200` covers most PRs. If a PR branches off a
+// base that's much older, the merge-base can fall outside that window and the
+// diff comes out larger than the real one (more pages flagged, never fewer — the
+// gate errs on the safe side). If that happens, increase the depth or turn off
+// shallow cloning in the job configuration.
+//
+// Without Multibranch Pipeline there's no CHANGE_TARGET: export WIKI_BASE on the
+// job (`environment { WIKI_BASE = 'origin/develop' }`) so the gate knows the base.
+//
+// Agent without Docker: swap the `agent` block for `agent any` plus
+// `tools { nodejs 'node-24' }` (NodeJS plugin, configured under Global Tool
+// Configuration) and remove the `apk add` from the History stage.
