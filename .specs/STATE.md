@@ -68,11 +68,11 @@
 
 ## Handoff
 
-- **Feature**: wiki-kit (`.specs/features/wiki-kit/`)
-- **Phase / Task**: Tasks — `tasks.md` written (24 tasks, 5 phases), awaiting user approval before Execute
-- **Completed**: Specify (spec.md + context.md, approved), Design (design.md, approved)
-- **In-progress**: `.specs/features/wiki-kit/tasks.md` — written, validated (granularity/diagram-cross-check/test-co-location all pass), not yet approved by user
-- **Next step**: Present tasks.md + ask about MCPs/Skills per tasks.md process step 6, then on approval invoke Execute (tlc-spec-driven skill, per tasks.md's Execution Protocol)
+- **Feature**: wiki-kit (`.specs/features/wiki-kit/`) — DONE
+- **Phase / Task**: Complete — Specify → Design → Tasks → Execute → Verify, all passed
+- **Completed**: All 24 tasks (T1-T24) implemented and merged to `feat/setup`; independent Verifier ran (author ≠ verifier): 29/29 ACs verified, 224/224 tests passing, 9/9 discrimination-sensor mutations killed, zero-runtime-dependency invariant structurally confirmed. One minor spec-precision gap (INIT-03 Jenkins wording) found and resolved by correcting `spec.md` to match the built (better) behavior — see `.specs/features/wiki-kit/validation.md` Resolution section.
+- **In-progress**: none
+- **Next step**: Feature is ready for the user's own review; not yet published to npm (still `0.1.0`, `npm pack --dry-run` verified but no `npm publish` run — that's a separate, explicit decision per this project's release checklist in `CLAUDE.md`)
 - **Blockers**: none
-- **Uncommitted files**: `.specs/` tree (new — spec.md, context.md, design.md, tasks.md, STATE.md), `docs/superpowers/specs/2026-08-14-package-architecture-design.md` (already committed)
-- **Branch**: feat/setup
+- **Uncommitted files**: `.specs/features/wiki-kit/spec.md` (INIT-03 correction), `.specs/features/wiki-kit/validation.md` (new), `.specs/LESSONS.md`/`.specs/lessons.json` (new, from the Verifier's L-001 candidate lesson)
+- **Branch**: feat/setup (32 commits ahead of main for this feature, all local — nothing pushed)

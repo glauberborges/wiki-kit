@@ -143,8 +143,14 @@ built once P1 proves the underlying engine is correct.
    the flag values or the documented defaults (see Assumptions).
 3. WHEN `.github/` exists in the target repo THEN `init` SHALL copy the
    GitHub Actions workflow template. WHEN `Jenkinsfile` exists (and
-   `.github/` doesn't) THEN it SHALL print the Jenkins stages to add. WHEN
-   neither exists THEN it SHALL print the two manual shell commands.
+   `.github/` doesn't) THEN it SHALL write `Jenkinsfile.wiki` (the Jenkins
+   stage definitions, same template-copy treatment as the GitHub branch) and
+   print a pointer to it for the user to wire into their existing pipeline —
+   corrected from an earlier "print the stages inline" wording after the
+   Verifier found the built behavior (a file to diff/copy from) matches the
+   reference `SKILL.md`'s own guidance ("incorporate into an existing
+   Jenkinsfile") better than a wall of Groovy dumped to a terminal would.
+   WHEN neither exists THEN it SHALL print the two manual shell commands.
 4. WHEN `wiki-kit init` runs a second time with no conflicting files THEN it
    SHALL make no changes to already-correct files (idempotent).
 5. WHEN `init` finds existing target files without `--force` THEN it SHALL
@@ -267,35 +273,35 @@ a new commit on the hub's default branch, and confirm a missing
 
 | Requirement ID | Story | Phase | Status |
 | --- | --- | --- | --- |
-| CORE-01 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-02 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-03 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-04 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-05 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-06 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-07 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-08 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-09 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-10 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-11 | P1: Core CLI parity | Tasks | In Tasks |
-| CORE-12 | P1: Core CLI parity | Tasks | In Tasks |
-| INIT-01 | P2: init | Tasks | In Tasks |
-| INIT-02 | P2: init | Tasks | In Tasks |
-| INIT-03 | P2: init | Tasks | In Tasks |
-| INIT-04 | P2: init | Tasks | In Tasks |
-| INIT-05 | P2: init | Tasks | In Tasks |
-| INIT-06 | P2: init | Tasks | In Tasks |
-| INIT-07 | P2: init | Tasks | In Tasks |
-| INIT-08 | P2: init | Tasks | In Tasks |
-| UPD-01 | P2: wiki-kit update | Tasks | In Tasks |
-| UPD-02 | P2: wiki-kit update | Tasks | In Tasks |
-| UPD-03 | P2: wiki-kit update | Tasks | In Tasks |
-| UPD-04 | P2: wiki-kit update | Tasks | In Tasks |
-| UPD-05 | P2: wiki-kit update | Tasks | In Tasks |
-| HUB-01 | P3: hub push | Tasks | In Tasks |
-| HUB-02 | P3: hub push | Tasks | In Tasks |
-| HUB-03 | P3: hub push | Tasks | In Tasks |
-| HUB-04 | P3: hub push | Tasks | In Tasks |
+| CORE-01 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-02 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-03 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-04 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-05 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-06 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-07 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-08 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-09 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-10 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-11 | P1: Core CLI parity | Tasks | ✅ Verified |
+| CORE-12 | P1: Core CLI parity | Tasks | ✅ Verified |
+| INIT-01 | P2: init | Tasks | ✅ Verified |
+| INIT-02 | P2: init | Tasks | ✅ Verified |
+| INIT-03 | P2: init | Tasks | ✅ Verified — AC wording corrected to match the built (file-based) Jenkins behavior after the Verifier's Gap 1 finding; code was already correct and tested |
+| INIT-04 | P2: init | Tasks | ✅ Verified |
+| INIT-05 | P2: init | Tasks | ✅ Verified |
+| INIT-06 | P2: init | Tasks | ✅ Verified |
+| INIT-07 | P2: init | Tasks | ✅ Verified |
+| INIT-08 | P2: init | Tasks | ✅ Verified |
+| UPD-01 | P2: wiki-kit update | Tasks | ✅ Verified |
+| UPD-02 | P2: wiki-kit update | Tasks | ✅ Verified |
+| UPD-03 | P2: wiki-kit update | Tasks | ✅ Verified |
+| UPD-04 | P2: wiki-kit update | Tasks | ✅ Verified |
+| UPD-05 | P2: wiki-kit update | Tasks | ✅ Verified |
+| HUB-01 | P3: hub push | Tasks | ✅ Verified |
+| HUB-02 | P3: hub push | Tasks | ✅ Verified |
+| HUB-03 | P3: hub push | Tasks | ✅ Verified |
+| HUB-04 | P3: hub push | Tasks | ✅ Verified |
 
 **ID format:** `[CATEGORY]-[NUMBER]` — `CORE` (verification engine: lint /
 affected / ingest-prompt / llms), `INIT` (scaffolding), `UPD` (agent-

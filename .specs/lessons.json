@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "promote_threshold": 2,
+  "window_days": 45,
+  "quarantine_threshold": 2,
+  "next_id": 2,
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "ac_gap::when a spec ac specifies the literal i o channel e g print to stdout vs write a file verify the implementation matches that channel exactly a file based delivery of equivalent content is still a deviation from a print requirement not an equivalent implementation",
+      "text": "When a spec AC specifies the literal I/O channel (e.g. print to stdout vs. write a file), verify the implementation matches that channel exactly — a file-based delivery of equivalent content is still a deviation from a 'print' requirement, not an equivalent implementation.",
+      "signal": "ac_gap",
+      "scope": "init",
+      "status": "candidate",
+      "features": [
+        "wiki-kit"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "spec.md P2 AC-03 (INIT-03) vs src/commands/init.ts:100-111 (init)"
+      ],
+      "created": "2026-08-14T21:21:37Z",
+      "last_seen": "2026-08-14T21:21:37Z"
+    }
+  ]
+}
