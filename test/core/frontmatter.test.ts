@@ -60,6 +60,25 @@ describe("parseFrontMatter", () => {
     expect(parseFrontMatter("keywords: [a, b, c]").keywords).toEqual(["a", "b", "c"]);
   });
 
+  it("resolves a list nested inside an inline map — apply-to in a rule entry", () => {
+    // Found while building core/config.ts (T4): `apply-to` in the shipped
+    // default config sits inside an inline map, e.g.
+    // `{ severity: error, apply-to: [architecture, reference] }`. Both
+    // inlineMap and inlineList used to dispatch nested values through the
+    // plain scalar() parser, so this arrived as the literal string
+    // "[architecture, reference]" instead of an array — inherited unchanged
+    // from the reference implementation, which never exercised this shape
+    // (it never had a config file). Fixed by making inlineMap/inlineList
+    // share the same [ / { dispatch parseFrontMatter's top level already used.
+    const fm = parseFrontMatter("rule: { severity: error, apply-to: [architecture, reference] }");
+    expect(fm.rule).toEqual({ severity: "error", "apply-to": ["architecture", "reference"] });
+  });
+
+  it("resolves a map nested inside an inline list", () => {
+    const fm = parseFrontMatter("items: [{ a: 1 }, { b: 2 }]");
+    expect(fm.items).toEqual([{ a: 1 }, { b: 2 }]);
+  });
+
   it("terminates on front-matter whose nested block is the last line — infinite-loop regression", () => {
     // The nested-block collector must advance the cursor; without that the
     // parser would stack the same line until it blew past the max array size.

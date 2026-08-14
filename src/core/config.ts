@@ -49,19 +49,10 @@ function asNumber(value: unknown, keyPath: string, filePath: string): number {
 }
 
 function asStringArray(value: unknown, keyPath: string, filePath: string): string[] {
-  // inlineMap() in frontmatter.ts resolves each `{k: v}` entry with the plain
-  // scalar() parser, so it never recurses into a `[...]` nested inside an
-  // inline map (e.g. `apply-to` in `{ severity: error, apply-to: [a, b] }`) —
-  // that arrives here as the literal string "[a, b]". Unwrapped locally
-  // rather than changing the shared parser for one config-only field shape.
-  const items = typeof value === "string" && value.startsWith("[") && value.endsWith("]")
-    ? value.slice(1, -1).split(",").map((item) => item.trim()).filter((item) => item !== "")
-    : value;
-
-  if (!Array.isArray(items) || items.some((item) => typeof item !== "string")) {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     fail(filePath, keyPath, "must be a list of strings");
   }
-  return items as string[];
+  return value as string[];
 }
 
 function parseRules(raw: unknown, filePath: string): WikiKitConfig["rules"] {

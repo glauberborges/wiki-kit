@@ -42,16 +42,26 @@ function inlineMap(raw: string): Record<string, unknown> {
   for (const part of splitTopLevel(body)) {
     const i = part.indexOf(":");
     if (i === -1) continue;
-    out[stripQuotes(part.slice(0, i))] = scalar(part.slice(i + 1));
+    out[stripQuotes(part.slice(0, i))] = inlineValue(part.slice(i + 1));
   }
   return out;
 }
 
-/** `[a, b]` → array. Items shaped like `{...}` become objects. */
+/** Dispatches a raw inline value by its leading character — same rule the
+ * top-level parser uses, so `{severity: error, apply-to: [a, b]}` resolves
+ * `apply-to` to an array instead of the literal string `"[a, b]"`. */
+function inlineValue(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) return inlineList(trimmed);
+  if (trimmed.startsWith("{")) return inlineMap(trimmed);
+  return scalar(trimmed);
+}
+
+/** `[a, b]` → array. Items shaped like `{...}` or `[...]` recurse. */
 function inlineList(raw: string): unknown[] {
   const body = raw.trim().slice(1, -1);
   if (!body.trim()) return [];
-  return splitTopLevel(body).map((p) => (p.trim().startsWith("{") ? inlineMap(p) : scalar(p)));
+  return splitTopLevel(body).map((p) => inlineValue(p));
 }
 
 /** Comma-split that respects {} [] nesting and quotes. */
@@ -99,9 +109,7 @@ export function parseFrontMatter(head: string): Record<string, unknown> {
     i++;
 
     if (inline !== "") {
-      if (inline.startsWith("[")) out[key] = inlineList(inline);
-      else if (inline.startsWith("{")) out[key] = inlineMap(inline);
-      else out[key] = scalar(inline);
+      out[key] = inlineValue(inline);
       continue;
     }
 
