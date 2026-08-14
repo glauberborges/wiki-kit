@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import { createInterface, type Interface } from "node:readline/promises";
 
 export interface HubAnswer {
