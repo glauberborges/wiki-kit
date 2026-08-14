@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main } from "../src/cli.js";
 
+const lintRun = vi.fn();
+vi.mock("../src/commands/lint.js", () => ({ run: (args: string[]) => lintRun(args) }));
+
 describe("cli routing", () => {
   const originalExitCode = process.exitCode;
 
@@ -62,8 +65,12 @@ describe("cli routing", () => {
   });
 
   it("routes a known command to its module", async () => {
-    // `affected` is still a stub; `lint` (T10) is real now, so routing is
-    // exercised against a command module that hasn't landed yet.
-    await expect(main(["affected"])).rejects.toThrow("not implemented yet");
+    // Mocks commands/lint.js's own `run` rather than relying on some other
+    // command still being an unimplemented stub — that assumption breaks
+    // every time another command's task lands (already happened twice: T10
+    // repointed this at `affected`, then T11 made `affected` real too).
+    lintRun.mockClear();
+    await main(["lint", "--strict"]);
+    expect(lintRun).toHaveBeenCalledWith(["--strict"]);
   });
 });
