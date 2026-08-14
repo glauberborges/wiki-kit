@@ -1,8 +1,3 @@
-// The installed TypeScript (native preview, 7.x) doesn't auto-include
-// @types/node the way classic tsc does — without this, `node:fs`/`node:path`
-// fail to resolve under --noEmit. Scoped to this file rather than adding
-// "types" to tsconfig.json, which is out of this task's scope.
-/// <reference types="node" />
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
