@@ -62,6 +62,8 @@ describe("cli routing", () => {
   });
 
   it("routes a known command to its module", async () => {
-    await expect(main(["lint"])).rejects.toThrow("not implemented yet");
+    // `affected` is still a stub; `lint` (T10) is real now, so routing is
+    // exercised against a command module that hasn't landed yet.
+    await expect(main(["affected"])).rejects.toThrow("not implemented yet");
   });
 });
