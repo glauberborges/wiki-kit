@@ -71,7 +71,12 @@ function buildPlan(
   const wikiTemplateRoot = join(templatesRoot, "wiki");
   for (const absSrc of walkFiles(wikiTemplateRoot)) {
     const rel = relative(wikiTemplateRoot, absSrc);
-    const absTarget = join(repoRoot, "wiki", rel);
+    // npm's packer hardcodes .gitignore/.npmignore out of every published
+    // tarball, `files` allowlist or not — the template ships dotless as
+    // `gitignore` and is renamed back here, the standard workaround for that
+    // npm limitation. Confirmed by extracting a real `npm pack` tarball.
+    const targetRel = rel === "gitignore" ? ".gitignore" : rel;
+    const absTarget = join(repoRoot, "wiki", targetRel);
     entries.push(makeEntry(repoRoot, absTarget, renderFile(absSrc, answers, rel)));
   }
 
