@@ -234,17 +234,20 @@ and run `bin/cli.js` directly:
 npm run build && node bin/cli.js lint
 ```
 
-Or link it once so `wiki-kit` resolves to this checkout globally, and just
-rebuild between runs:
+For a command you can leave installed while developing, `make install-dev`
+links `wiki-kit-dev` — a second, separate command that always points at
+this checkout, so it never collides with a real `wiki-kit` (from `npx` or
+`npm install -g`):
 
 ```bash
-npm link                          # one-time
-npm run build && wiki-kit lint    # after every change — same as a real install
-npm unlink -g @glauberborges/wiki-kit   # when you're done
+make install-dev          # one-time
+wiki-kit-dev --help       # now resolves to this checkout, always
+make dev                  # after every change — rebuilds; the symlink stays valid
+make uninstall-dev         # when you're done
 ```
 
-There's no watch mode — rebuild (`npm run build`) after touching anything
-under `src/` before re-running the CLI.
+There's no watch mode — run `make dev` (or `npm run build`) after touching
+anything under `src/` before re-running `wiki-kit-dev` or `bin/cli.js`.
 
 ## Status
 
