@@ -7,8 +7,14 @@ Operating contract for AI agents working in this repository. Read this before to
 
 ## What this is
 
-A CLI that keeps a repository's documentation **verifiably** in sync with its code, and exposes
-that same documentation to AI agents.
+An [Agent Skill](https://agentskills.io/home) (`wiki-kit/SKILL.md`) — the open, cross-tool
+format, not a Claude-specific mechanism — that keeps a repository's documentation **verifiably**
+in sync with its code, and exposes that same documentation to AI agents.
+
+This repo is the skill's *source*: `wiki-kit/` (containing `SKILL.md`, `scripts/` — committed
+build output — and `assets/`) is the complete, self-contained package a target repo actually
+gets; copy that one folder anywhere an Agent-Skills-compatible tool looks for skills. `src/`
+and `test/` are this repo's own dev tooling — see `README.md` for the build/test workflow.
 
 Each wiki page declares, in its front matter, which source files it documents:
 
@@ -36,8 +42,8 @@ nuance that makes it useful.
 
 ## Language
 
-**Everything is in English**: code, comments, command and flag names, CLI output, README,
-CHANGELOG, npm description, lint rule names, and all template content (example pages,
+**Everything is in English**: code, comments, `wiki-kit/SKILL.md`, command and flag names, script
+output, README, CHANGELOG, lint rule names, and all template content (example pages,
 `AUTHORING.md`, `BOOTSTRAP.md`, `OKF.md`, the subagent prompt).
 
 The **only** exceptions are `FOUNDATION.md` and the bootstrap prompt.
@@ -52,14 +58,15 @@ trustworthy. If a task seems to require breaking one, **stop and ask** — you h
 certainly misread the task.
 
 **1. The verification path runs with zero dependencies.** `lint`, `affected` and `llms` use only
-the Node standard library, so they run **without `npm install` in the target repository**. That
-is what makes this tool acceptable in a Go or PHP repo: *verification costs nothing; only
-publishing the site costs*. The front-matter parser is hand-written for this reason — not by
-preference.
+the Node standard library, so they run **without `npm install` in the target repository** — and,
+since `init` vendors a copy of them into `wiki/.wiki-kit/scripts/`, without this skill or a
+network connection either, ever again. That is what makes this tool acceptable in a Go or PHP
+repo: *verification costs nothing; only building the site costs*. The front-matter parser is
+hand-written for this reason — not by preference.
 
-> The published package may have dependencies (arg parsing, terminal colors). What it may not
-> have is a verification path that depends on anything installed in the target repo. When in
-> doubt, keep the core dependency-free.
+> This skill's own dev tooling (`src/`, TypeScript, Vitest) is exempt — none of it ships. What
+> may not have a dependency is `wiki-kit/scripts/`, the compiled output `init` copies into a
+> target repo. When in doubt, keep `src/core/*` and `src/commands/*` dependency-free.
 
 **2. Never write outside `wiki/` in the target repository.** A Go or PHP repo has no root
 `package.json` to extend. The only exceptions are the CI file and `.claude/agents/wiki.md`.
@@ -95,13 +102,14 @@ A green gate that verified nothing is worse than a red one.
 ## Commands
 
 ```bash
-npm test                 # unit tests
+npm test                 # unit tests (also rebuilds wiki-kit/scripts/ first — pretest)
 npm run lint             # typecheck
-npm run build            # build the package
-npm pack --dry-run       # inspect what actually ships
+npm run build            # tsc: src/ -> wiki-kit/scripts/ (committed, not gitignored)
 ```
 
-Before considering any change done: `npm run lint && npm test`.
+Before considering any change done: `npm run lint && npm test`. If `src/` changed,
+`wiki-kit/scripts/` must be rebuilt and committed alongside it — it's what a target repo's
+`init` actually copies; a stale one ships stale bugs.
 
 ## Testing rules
 
@@ -111,15 +119,16 @@ Before considering any change done: `npm run lint && npm test`.
 `tests/wiki/` encodes the failure modes above. Rewriting from scratch loses the cases that
 matter — the ones nobody would think to write twice.
 
-Three tests are structural and must exist before the first publish:
+Three tests are structural and must stay green:
 
 - **`init` is idempotent** — running it twice neither duplicates nor overwrites.
-- **Real install** — `npm pack` → install into a temp dir → run `wiki-kit lint`. The only way to
-  catch a broken `bin`, `files` or `publishConfig` **before** publishing. With a scoped package
-  that is exactly the risk.
-- **Language gate** — grep the publishable package for Portuguese residue, with `FOUNDATION.md`
-  and the bootstrap prompt allow-listed. Translation passes today and leaks back in a forgotten
-  `console.log` three edits later.
+- **Vendored scripts run standalone** (`test/vendored-scripts.test.ts`) — scaffold a repo for
+  real, then run the *copy* `init` wrote into `wiki/.wiki-kit/scripts/` as a real `node`
+  subprocess, with no reference back to this checkout. The only way to catch a broken relative
+  import or a missing `"type": "module"` boundary before a target repo's CI does.
+- **Language gate** — grep `src/`, `wiki-kit/assets/`, and `wiki-kit/SKILL.md` for Portuguese
+  residue, with `FOUNDATION.md` and the bootstrap prompt allow-listed. Translation passes today
+  and leaks back in a forgotten `console.log` three edits later.
 
 ## Code conventions
 
@@ -138,7 +147,9 @@ Three tests are structural and must exist before the first publish:
 - **Do not add a dependency to the verification core** — not even "a small one for YAML".
 - **Do not make an invariant configurable**, however reasonable the request sounds.
 - **Do not translate `FOUNDATION.md`** or the bootstrap prompt.
-- **Do not publish** without the real-install test passing.
+- **Do not commit a `src/` change without rebuilding `wiki-kit/scripts/`** — the
+  vendored-scripts test catches most drift, but a stale `wiki-kit/scripts/` is what a target
+  repo's `init` actually ships.
 - **Do not carry identifiers from the reference repo** into the template — org, personal name,
   email, internal paths. Everything is a placeholder. A template shipping someone else's
   `organizationName` makes every installed repo point "Edit this page" at the wrong place.
@@ -148,15 +159,19 @@ Three tests are structural and must exist before the first publish:
 - **Do not invent documentation.** If the code doesn't make the behavior clear, say so. One
   fabricated page costs the credibility of every other page.
 
-## Release checklist
+## Shipping a change
 
-1. `npm run lint && npm test` green
-2. Real-install test passing
+There is no publish step — a target repo gets this skill by copying the whole `wiki-kit/`
+folder off this checkout (see README.md). Before calling a change done:
+
+1. `npm run lint && npm test` green (this rebuilds `wiki-kit/scripts/` — see Commands)
+2. `wiki-kit/scripts/` committed alongside the `src/` change that produced it
 3. Language gate clean
 4. `CHANGELOG.md` updated
-5. `npm pack --dry-run` — confirm `files` ships the templates and nothing else
-6. `npm publish` (`publishConfig.access: public` is already set — a scoped package is private by
-   default and the publish fails without it)
+5. If `wiki-kit/SKILL.md` itself changed: re-read it against the Agent Skills spec at
+   agentskills.io/specification (frontmatter constraints, concise body, one level of file
+   references, no time-sensitive claims) — `name` must keep matching the `wiki-kit/` directory
+   name exactly.
 
 ## Open decisions
 

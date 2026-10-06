@@ -9,7 +9,6 @@ export interface WikiKitConfig {
   okf: { types: string[] };
   output: { dir: string; artifacts: string[]; "llms-max-kb": number };
   hub?: { repo: string; branch: string };
-  update?: { agent: string };
 }
 
 const CONFIG_FILE = "wiki-kit.config.yaml";
@@ -78,7 +77,7 @@ export function loadConfig(wikiDir: string): WikiKitConfig {
   const filePath = join(wikiDir, CONFIG_FILE);
   if (!existsSync(filePath)) {
     throw new ConfigError(
-      `Config file not found: ${filePath} — run \`wiki-kit init\` to create it, or add a ${CONFIG_FILE} with rules/okf/output blocks (see FOUNDATION.md §7).`,
+      `Config file not found: ${filePath} — run this skill's init workflow to create it, or add a ${CONFIG_FILE} with rules/okf/output blocks (see FOUNDATION.md §7).`,
     );
   }
 
@@ -103,11 +102,6 @@ export function loadConfig(wikiDir: string): WikiKitConfig {
       repo: asString(hubRaw.repo, "hub.repo", filePath),
       branch: asString(hubRaw.branch, "hub.branch", filePath),
     };
-  }
-
-  if (raw.update !== undefined) {
-    const updateRaw = asRecord(raw.update, "update", filePath);
-    config.update = { agent: asString(updateRaw.agent, "update.agent", filePath) };
   }
 
   return config;

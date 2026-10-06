@@ -5,7 +5,7 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "types": ["node"],
-    "outDir": "dist",
+    "outDir": "wiki-kit/scripts",
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,

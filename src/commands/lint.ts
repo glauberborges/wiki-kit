@@ -1,10 +1,11 @@
-// CLI adapter for `wiki-kit lint` — thin wrapper over core/lint-rules.ts's
-// engine. Output format and exit-code rule are ported from wiki-lint.mjs's
-// `main()` plain-lint branch (lines 514-527), translated to English.
+// `lint` — thin wrapper over core/lint-rules.ts's engine. Output format and
+// exit-code rule are ported from wiki-lint.mjs's `main()` plain-lint branch
+// (lines 514-527), translated to English.
 
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { loadConfig } from "../core/config.js";
+import { runCli } from "../core/entrypoint.js";
 import { runLintRules } from "../core/lint-rules.js";
 import { findRepoRoot, loadPages } from "../core/pages.js";
 
@@ -36,3 +37,5 @@ export function run(args: string[]): void {
     process.exitCode = 1;
   }
 }
+
+runCli(import.meta.url, () => run(process.argv.slice(2)));

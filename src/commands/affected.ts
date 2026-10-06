@@ -1,4 +1,4 @@
-// CLI adapter for `wiki-kit affected [--base <ref>] [--strict]`.
+// `affected [--base <ref>] [--strict]`.
 // Reuses core/base-ref.ts's computeAffected; this file only formats output
 // and implements the --strict CI gate (CORE-12) — the part that has no
 // equivalent in core/ because it's presentation + exit-status policy, not a
@@ -7,6 +7,7 @@
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { bareBranch, computeAffected, resolveBase, type AffectedResult } from "../core/base-ref.js";
+import { runCli } from "../core/entrypoint.js";
 import { findRepoRoot, loadPages, type Page } from "../core/pages.js";
 
 function printAffected(result: AffectedResult, base: string): void {
@@ -98,8 +99,10 @@ export function run(args: string[]): void {
         `${missed.length} page(s) declare sources that changed and were not updated:`,
         ...missed.map((slug) => `    ${result.docsPrefix}${slug}.md`),
         "",
-        "→ wiki-kit update",
+        "→ update the page(s) above to reflect the change.",
       ].join("\n"),
     );
   }
 }
+
+runCli(import.meta.url, () => run(process.argv.slice(2)));

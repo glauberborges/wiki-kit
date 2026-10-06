@@ -1,22 +1,18 @@
-// CLI adapter for `wiki-kit init` — wires detect-stack (T14), prompts (T18),
-// and scaffold (T19, which already calls ci-select internally) into the
-// end-to-end INIT-01..08 flow. Flag names below match placeholders.ts's own
-// PLACEHOLDER_FLAGS table exactly, so the "missing answer" error it throws
-// for {{TAGLINE}}/{{TAGLINE_LONG}} (no documented default — see spec.md's
-// Assumptions table) already names the right flag without duplicating that
-// validation here.
+// `init` — scaffolds a new wiki. The interactive part (project name, org,
+// locale, whether to connect a hub) happens in conversation before this runs
+// — Claude asks, then calls this script with the answers as flags. This
+// script only does the deterministic part: detect the stack, render
+// templates, pick a CI file.
 
 import { parseArgs } from "node:util";
 import { basename, join } from "node:path";
+import { runCli } from "../core/entrypoint.js";
 import { findRepoRoot } from "../core/pages.js";
 import { detectStack } from "../init/detect-stack.js";
-import { askInteractive, type InitAnswers as PromptAnswers } from "../init/prompts.js";
 import { scaffold, type ScaffoldAnswers, type ScaffoldResult } from "../init/scaffold.js";
 
-// Translated from SKILL.md's "O gate em qualquer CI" two-command fallback —
-// the port splits the reference's single wiki-lint.mjs script into separate
-// lint/affected subcommands (design.md), so the translation is these two.
-const MANUAL_GATE_COMMANDS = ["wiki-kit lint", "wiki-kit affected --strict"];
+const DEFAULT_LOCALE = "en";
+const MANUAL_GATE_COMMANDS = ["make -C wiki lint", "make -C wiki affected-strict"];
 
 export async function run(args: string[]): Promise<void> {
   const { values } = parseArgs({
@@ -39,31 +35,20 @@ export async function run(args: string[]): Promise<void> {
   const repoRoot = findRepoRoot(process.cwd());
   reportDetectedStack(repoRoot);
 
-  const known: Partial<PromptAnswers> = {
+  const locale = values.locale ?? DEFAULT_LOCALE;
+  const scaffoldAnswers: ScaffoldAnswers = {
     project: values.project,
     org: values.org,
-    locale: values.locale,
-  };
-  // Leaving `hub` unset (vs. explicitly null) is what tells askInteractive to
-  // prompt on a TTY or default to "no hub" off one — see INIT AC 8's
-  // interactive/flag rule, same one AC 2 uses for project/org/locale.
-  if (values["hub-repo"] !== undefined) {
-    known.hub = { repo: values["hub-repo"], branch: values["hub-branch"] ?? "main" };
-  }
-
-  const answers = await askInteractive(known);
-
-  const scaffoldAnswers: ScaffoldAnswers = {
-    project: answers.project,
-    org: answers.org,
-    // Not part of AC 2's inferred-or-prompted trio — a plain directory-name
+    // Not part of the inferred-or-asked trio — a plain directory-name
     // default keeps init runnable without a flag for the common case.
     repo: values.repo ?? basename(repoRoot),
-    locale: answers.locale,
-    searchLang: values["search-lang"] ?? answers.locale.split("-")[0],
+    locale,
+    searchLang: values["search-lang"] ?? locale.split("-")[0],
     tagline: values.tagline,
     taglineLong: values["tagline-long"],
-    hub: answers.hub,
+    hub: values["hub-repo"] !== undefined
+      ? { repo: values["hub-repo"], branch: values["hub-branch"] ?? "main" }
+      : null,
   };
 
   const result = await scaffold(repoRoot, scaffoldAnswers, { force: values.force === true });
@@ -112,3 +97,5 @@ function printSummary(result: ScaffoldResult, repoRoot: string): void {
 
   console.log(`\nWiki root: ${join(repoRoot, "wiki")}`);
 }
+
+runCli(import.meta.url, () => run(process.argv.slice(2)));

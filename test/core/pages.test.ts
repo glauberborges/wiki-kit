@@ -72,8 +72,8 @@ describe("normalizeSources", () => {
 });
 
 // The reference test loads pages from the reference repo's own live wiki.
-// wiki-kit's own repo has no such wiki (templates/wiki is a scaffold with
-// {{PLACEHOLDER}} tokens, not a documented codebase), so this builds a
+// wiki-kit's own repo has no such wiki (wiki-kit/assets/wiki is a scaffold
+// with {{PLACEHOLDER}} tokens, not a documented codebase), so this builds a
 // throwaway fixture wiki instead and asserts the same behaviors.
 describe("loadPages", () => {
   let repoRoot: string;

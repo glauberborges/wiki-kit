@@ -18,8 +18,8 @@
 
 pipeline {
     // The lint doesn't need npm install or node_modules — only the Node binary
-    // (npx fetches wiki-kit itself). That's why the slim image is enough and the
-    // stage costs seconds.
+    // (the verification scripts were vendored into wiki/.wiki-kit/scripts/ by
+    // init). That's why the slim image is enough and the stage costs seconds.
     agent {
         docker {
             image 'node:24-alpine'
@@ -56,7 +56,7 @@ pipeline {
             // Front matter, missing source, staleness, broken link.
             // Runs on every build, including branch builds.
             steps {
-                sh 'npx -y @glauberborges/wiki-kit lint'
+                sh 'make -C wiki lint'
             }
         }
 
@@ -64,12 +64,12 @@ pipeline {
             // The gate: code changed and the page declaring it as a source didn't.
             // PR only — a branch build has no base to compare against.
             //
-            // The base is resolved automatically from CHANGE_TARGET (wiki-kit
-            // knows the env vars for Jenkins, GitHub Actions, GitLab, and
-            // Bitbucket), so there's no need to pass --base here.
+            // The base is resolved automatically from CHANGE_TARGET (the
+            // affected script knows the env vars for Jenkins, GitHub Actions,
+            // GitLab, and Bitbucket), so there's no need to pass --base here.
             when { expression { env.CHANGE_TARGET } }
             steps {
-                sh 'npx -y @glauberborges/wiki-kit affected --strict'
+                sh 'make -C wiki affected-strict'
             }
         }
 
@@ -86,7 +86,7 @@ pipeline {
             steps {
                 sh '''
                     set -eu
-                    npx -y @glauberborges/wiki-kit llms
+                    make -C wiki llms
                     npm --prefix wiki ci --no-audit --no-fund
                     npm --prefix wiki run build
                 '''
@@ -101,7 +101,7 @@ pipeline {
 
     post {
         failure {
-            echo 'Docs stale? Run locally: make -C wiki ingest-prompt'
+            echo 'Docs stale? Run locally: make -C wiki affected — then update the pages it lists.'
         }
     }
 }

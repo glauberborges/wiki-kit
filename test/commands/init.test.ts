@@ -85,8 +85,8 @@ describe("wiki-kit init", () => {
 
     const output = log.mock.calls.map((c) => c[0]).join("\n");
     expect(output).toContain("Go");
-    expect(output).toContain("wiki-kit lint");
-    expect(output).toContain("wiki-kit affected --strict");
+    expect(output).toContain("make -C wiki lint");
+    expect(output).toContain("make -C wiki affected-strict");
   });
 
   it("running init a second time makes no further file changes (INIT-04)", async () => {

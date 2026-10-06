@@ -1,7 +1,8 @@
 # Wiki — docs lint and site build.
 #
 # Deliberately self-contained: does NOT depend on the host repo's toolchain. The
-# lint job needs only Node on PATH (npx fetches wiki-kit itself); the build job
+# lint job needs only Node on PATH (the verification scripts were vendored into
+# wiki/.wiki-kit/scripts/ by init — no npm install, no network); the build job
 # needs npm inside wiki/. That's why this file works the same in a Go, PHP, or
 # Python repo — and why it's a separate workflow, not a job inside the main CI.
 
@@ -17,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Only needs Node on PATH: wiki-kit itself uses only the stdlib, and npx
-  # fetches it on demand — no local npm install, no node_modules, in this repo.
+  # Only needs Node on PATH: the vendored scripts use only the stdlib — no
+  # npm install, no node_modules, in this repo.
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -39,10 +40,10 @@ jobs:
       # PR only — a direct push to main has no base to compare against.
       - name: Docs in sync with the code
         if: github.event_name == 'pull_request'
-        # The base is resolved automatically from GITHUB_BASE_REF — wiki-kit
-        # knows the env vars for GitHub Actions, Jenkins, GitLab, and
-        # Bitbucket, so the same command works in any CI.
-        run: npx -y @glauberborges/wiki-kit affected --strict
+        # The base is resolved automatically from GITHUB_BASE_REF — the
+        # affected script knows the env vars for GitHub Actions, Jenkins,
+        # GitLab, and Bitbucket, so the same command works in any CI.
+        run: make -C wiki affected-strict
 
   # Costs an `npm ci` — runs only when the wiki changes. This is where
   # Docusaurus's `onBrokenLinks: 'throw'` actually fails the build.
@@ -62,7 +63,7 @@ jobs:
         run: npm --prefix wiki ci --no-audit --no-fund
 
       - name: Generate the LLM layer
-        run: npx -y @glauberborges/wiki-kit llms
+        run: make -C wiki llms
 
       - name: Build the site
         run: npm --prefix wiki run build
@@ -72,28 +73,3 @@ jobs:
           name: wiki-site
           path: wiki/build/
           retention-days: 7
-
-# Optional — CI writing the docs by itself, CI playing the role of an
-# automatic documentation agent. OFF by default: it needs an API key in
-# secrets and, in a repo with external contributions, care about who can
-# trigger the job. Turn it on as a deliberate decision, not by default.
-#
-#  ingest:
-#    runs-on: ubuntu-latest
-#    if: github.event_name == 'pull_request'
-#    permissions: { contents: write, pull-requests: write }
-#    steps:
-#      - uses: actions/checkout@v4
-#        with: { fetch-depth: 0, ref: ${{ github.head_ref }} }
-#      - uses: actions/setup-node@v4
-#        with: { node-version: "24" }
-#      - id: prompt
-#        run: |
-#          echo "text<<EOF" >> "$GITHUB_OUTPUT"
-#          npx -y @glauberborges/wiki-kit ingest-prompt \
-#            --base "origin/${{ github.base_ref }}" >> "$GITHUB_OUTPUT"
-#          echo "EOF" >> "$GITHUB_OUTPUT"
-#      - uses: anthropics/claude-code-action@v1
-#        with:
-#          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-#          prompt: ${{ steps.prompt.outputs.text }}

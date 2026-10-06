@@ -111,7 +111,7 @@ describe("affected", () => {
 
     vi.spyOn(console, "log").mockImplementation(() => {});
     expect(() => run(["--base", "origin/main", "--strict"])).toThrow(/wiki\/docs\/architecture\.md/);
-    expect(() => run(["--base", "origin/main", "--strict"])).toThrow(/wiki-kit update/);
+    expect(() => run(["--base", "origin/main", "--strict"])).toThrow(/update the page/);
   });
 
   it("--strict passes when the affected page was itself also updated", () => {

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -10,15 +10,16 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // record never agreed to.
 const PORTUGUESE_MARKERS = ["ção", "ções", "não", "página", "arquivo", "código"];
 
-// dist/ isn't committed and may not exist in a bare checkout, so this scans
-// src/ instead — src/ is what dist/ is compiled from, i.e. the real source
-// of truth for what ships.
-const SCAN_ROOTS = ["src", "bin", "templates"];
+// wiki-kit/scripts/ is compiled from src/ 1:1 — scanning src/ (the source of
+// truth) already covers it, without requiring a build before this test can
+// run. wiki-kit/SKILL.md and wiki-kit/assets/ are scanned directly — they
+// have no src/ equivalent.
+const SCAN_ROOTS = ["src", "wiki-kit/assets", "wiki-kit/SKILL.md"];
 
 // FOUNDATION.md §9 allow-lists FOUNDATION.md and the opening session prompt
-// (PROMPTSESSAONOVA.md). Neither lives under src/, bin/, or templates/, so
-// SCAN_ROOTS never reaches them — no active exclusion logic is needed, this
-// comment just records that the allowlist is honored by construction.
+// (PROMPTSESSAONOVA.md). Neither is in SCAN_ROOTS, so no active exclusion
+// logic is needed — this comment just records that the allowlist is honored
+// by construction.
 
 interface Violation {
   file: string;
@@ -27,10 +28,11 @@ interface Violation {
   text: string;
 }
 
-function walk(dir: string): string[] {
+function walk(target: string): string[] {
+  if (statSync(target).isFile()) return [target];
   const files: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
+  for (const entry of readdirSync(target, { withFileTypes: true })) {
+    const full = join(target, entry.name);
     if (entry.isDirectory()) {
       files.push(...walk(full));
     } else if (entry.isFile()) {
@@ -63,7 +65,7 @@ function findViolations(): Violation[] {
 }
 
 describe("language gate", () => {
-  it("finds zero Portuguese residue in src/, bin/, and templates/", () => {
+  it("finds zero Portuguese residue in src/, templates/, and SKILL.md", () => {
     const violations = findViolations();
 
     if (violations.length > 0) {

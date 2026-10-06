@@ -41,7 +41,6 @@ describe("loadConfig", () => {
     expect(config.okf.types).toEqual(["Architecture", "Guide", "Reference", "Runbook", "Concept"]);
     expect(config.output).toEqual({ dir: "static", artifacts: ["llms", "llms-full", "map", "okf"], "llms-max-kb": 8 });
     expect(config.hub).toBeUndefined();
-    expect(config.update).toBeUndefined();
   });
 
   it("parses the optional hub block when present", () => {
@@ -49,15 +48,10 @@ describe("loadConfig", () => {
     expect(loadConfig(wikiDir).hub).toEqual({ repo: "acme/wiki-hub", branch: "main" });
   });
 
-  it("parses the optional update block when present", () => {
-    writeConfig(`${VALID}\nupdate:\n  agent: claude\n`);
-    expect(loadConfig(wikiDir).update).toEqual({ agent: "claude" });
-  });
-
   it("loads the shipped template config unmodified", () => {
     const templatePath = join(
       dirname(fileURLToPath(import.meta.url)),
-      "../../templates/wiki",
+      "../../wiki-kit/assets/wiki",
     );
     expect(() => loadConfig(templatePath)).not.toThrow();
   });
@@ -109,8 +103,4 @@ describe("loadConfig", () => {
     expect(() => loadConfig(wikiDir)).toThrowError(/hub\.branch/);
   });
 
-  it("throws ConfigError when update is present but missing agent", () => {
-    writeConfig(`${VALID}\nupdate:\n  nickname: bot\n`);
-    expect(() => loadConfig(wikiDir)).toThrowError(/update\.agent/);
-  });
 });

@@ -1,25 +1,16 @@
 {
-  "name": "@glauberborges/wiki-kit",
+  "name": "wiki-kit",
   "version": "0.1.0",
-  "description": "Verifiable documentation for any repository — front-matter driven staleness detection, cross-repo aggregation, and an llms.txt layer for agents, with zero runtime dependencies.",
+  "private": true,
+  "description": "Dev repo for the wiki-kit Agent Skill — verifiable documentation for any repository, front-matter driven staleness detection, cross-repo aggregation, and an llms.txt layer for agents. Source of truth for SKILL.md and scripts/; the shipped skill is not published to npm.",
   "type": "module",
-  "bin": {
-    "wiki-kit": "./bin/cli.js"
-  },
   "engines": {
     "node": ">=20"
-  },
-  "files": [
-    "dist",
-    "bin",
-    "templates"
-  ],
-  "publishConfig": {
-    "access": "public"
   },
   "scripts": {
     "build": "tsc",
     "lint": "tsc --noEmit",
+    "pretest": "npm run build",
     "test": "vitest run"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
-// `wiki-kit hub push` — copy this repo's generated artifacts into a checkout
-// of the configured hub repo, commit, push. Genuinely new: the reference
+// `hub-push` — copy this repo's generated artifacts into a checkout of the
+// configured hub repo, commit, push. Genuinely new: the reference
 // implementation has no cross-repo code to port (design.md).
 
 import { execFileSync } from "node:child_process";
@@ -7,6 +7,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { loadConfig } from "../core/config.js";
+import { runCli } from "../core/entrypoint.js";
 import { findRepoRoot } from "../core/pages.js";
 
 const ARTIFACT_FILES: Record<string, string> = {
@@ -16,11 +17,7 @@ const ARTIFACT_FILES: Record<string, string> = {
   okf: "okf",
 };
 
-export function run(args: string[]): void {
-  if (args[0] !== "push") {
-    throw new Error(`Unknown hub subcommand: ${args[0] ?? "(none)"} — usage: wiki-kit hub push`);
-  }
-
+export function run(): void {
   const repoRoot = findRepoRoot(process.cwd());
   const wikiDir = join(repoRoot, "wiki");
   const config = loadConfig(wikiDir);
@@ -30,7 +27,7 @@ export function run(args: string[]): void {
   const missing = fileNames.filter((name) => !existsSync(join(outDir, name)));
   if (missing.length > 0) {
     throw new Error(
-      `Missing artifact(s) under ${outDir}: ${missing.join(", ")} — run \`wiki-kit llms\` first to generate them.`,
+      `Missing artifact(s) under ${outDir}: ${missing.join(", ")} — run the llms script first to generate them.`,
     );
   }
 
@@ -46,8 +43,8 @@ export function run(args: string[]): void {
 
   if (!config.hub) {
     throw new Error(
-      `${join(wikiDir, "wiki-kit.config.yaml")} has no "hub:" block — run \`wiki-kit init\` and opt into ` +
-        "hub connection, or add hub.repo/hub.branch to the config manually before running `wiki-kit hub push`.",
+      `${join(wikiDir, "wiki-kit.config.yaml")} has no "hub:" block — run this skill's init workflow and opt ` +
+        "into hub connection, or add hub.repo/hub.branch to the config manually before running hub-push.",
     );
   }
   const { repo, branch } = config.hub;
@@ -177,7 +174,7 @@ function pushToHub({ workDir, repo, branch, repoName, token, outDir, fileNames }
     // HUB-03 / context.md: fail the job directly, no retry, no rebase attempt.
     throw new Error(
       `git push to ${repo} (${branch}) was rejected — another repo likely pushed to the hub concurrently. ` +
-        `Re-run \`wiki-kit hub push\` after checking the hub's history; wiki-kit does not retry or rebase ` +
+        `Re-run the hub-push script after checking the hub's history; it does not retry or rebase ` +
         `automatically. ${errorDetail(err)}`,
     );
   }
@@ -191,3 +188,5 @@ function pushToHub({ workDir, repo, branch, repoName, token, outDir, fileNames }
 function errorDetail(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
+
+runCli(import.meta.url, run);

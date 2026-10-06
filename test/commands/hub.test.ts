@@ -86,9 +86,9 @@ describe("hub push", () => {
     process.env.GIT_CONFIG_GLOBAL = gitConfigPath;
   }
 
-  it("fails naming `wiki-kit llms` when no artifacts exist on disk", () => {
+  it("fails naming the llms script when no artifacts exist on disk", () => {
     writeConfig("hub:\n  repo: acme/wiki-hub\n  branch: main\n");
-    expect(() => run(["push"])).toThrow(/wiki-kit llms/);
+    expect(() => run()).toThrow(/llms script/);
   });
 
   it("fails before any git operation when WIKI_HUB_TOKEN is unset", () => {
@@ -97,15 +97,15 @@ describe("hub push", () => {
     redirectToLocalHub("acme/unreachable-hub", join(scratchRoot, "does-not-exist"));
     delete process.env.WIKI_HUB_TOKEN;
 
-    expect(() => run(["push"])).toThrow(/WIKI_HUB_TOKEN/);
+    expect(() => run()).toThrow(/WIKI_HUB_TOKEN/);
   });
 
-  it("fails naming `wiki-kit init` when the hub: block is missing from config", () => {
+  it("fails naming the init workflow when the hub: block is missing from config", () => {
     writeArtifacts(join(wikiDir, "static"));
     writeConfig("");
     process.env.WIKI_HUB_TOKEN = "test-token";
 
-    expect(() => run(["push"])).toThrow(/wiki-kit init/);
+    expect(() => run()).toThrow(/init workflow/);
   });
 
   it("clones, commits, and pushes artifacts under docs/<repo-name> on the hub's branch", () => {
@@ -117,7 +117,7 @@ describe("hub push", () => {
     redirectToLocalHub("acme/wiki-hub", bareDir);
     process.env.WIKI_HUB_TOKEN = "test-token";
 
-    expect(() => run(["push"])).not.toThrow();
+    expect(() => run()).not.toThrow();
 
     const verifyDir = join(scratchRoot, "verify");
     execFileSync("git", ["clone", "-q", "--branch", "main", bareDir, verifyDir]);
@@ -146,16 +146,11 @@ describe("hub push", () => {
     redirectToLocalHub("acme/wiki-hub", bareDir);
     process.env.WIKI_HUB_TOKEN = "test-token";
 
-    expect(() => run(["push"])).toThrow(/rejected/);
+    expect(() => run()).toThrow(/rejected/);
 
     const calls = existsSync(counterPath)
       ? readFileSync(counterPath, "utf8").trim().split("\n").filter(Boolean)
       : [];
     expect(calls).toHaveLength(1);
-  });
-
-  it("rejects an unknown hub subcommand", () => {
-    expect(() => run([])).toThrow(/wiki-kit hub push/);
-    expect(() => run(["pull"])).toThrow(/wiki-kit hub push/);
   });
 });

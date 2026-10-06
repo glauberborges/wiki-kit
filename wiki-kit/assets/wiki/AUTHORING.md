@@ -17,14 +17,13 @@ bundle). Never write to the generated artifacts — only to the pages.
 ```bash
 make -C wiki lint            # front matter, sources, staleness, links
 make -C wiki affected        # what the current diff broke in the docs
-make -C wiki ingest-prompt   # a ready-to-paste prompt for an agent to update the docs
 make -C wiki llms            # regenerate the LLM artifacts
 make -C wiki serve           # run the site locally
 ```
 
-`lint`, `affected`, `ingest-prompt` and `llms` run on **plain `node`, no `npm install`** —
-that's what makes verification free in a repo that isn't JavaScript. Only `serve` and
-`build` need the Docusaurus toolchain.
+`lint`, `affected` and `llms` run on **plain `node`, no `npm install`** — that's what makes
+verification free in a repo that isn't JavaScript. Only `serve` and `build` need the
+Docusaurus toolchain.
 
 ## Front matter
 

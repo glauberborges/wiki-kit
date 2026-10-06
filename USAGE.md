@@ -1,0 +1,288 @@
+# Using wiki-kit
+
+`wiki-kit/SKILL.md` is what an agent reads to operate this skill. This doc is the
+human-readable version — every example below was actually run against a scratch repo, not
+written from memory. Commands below assume you're in this checkout's root; from inside the
+`wiki-kit/` folder itself, drop that prefix (`node scripts/commands/lint.js`).
+
+## The idea
+
+A wiki page's front matter names the source files it documents:
+
+```yaml
+sources:
+  - resource: src/auth/*.go
+```
+
+That one field is enough to compute, from git alone: whether a page is stale, which pages a diff
+affects, and a CI gate that fails a PR when code changed but its docs didn't. No LLM involved in
+any of that — see **Why zero dependencies** below.
+
+## Setting up a repo
+
+Ask Claude to set up the wiki (it has this skill), or run the script directly once you know the
+answers:
+
+```bash
+node wiki-kit/scripts/commands/init.js \
+  --project Acme --org acme \
+  --tagline "Payments API" --tagline-long "Handles checkout and refunds."
+```
+
+```
+init: detected Go (go.mod).
+init: wrote 28 file(s):
+  wiki/AUTHORING.md
+  wiki/Makefile
+  wiki/docs/architecture/_category_.json
+  ...
+  wiki/wiki-kit.config.yaml
+  .claude/agents/wiki.md
+  wiki/.wiki-kit/scripts/core/base-ref.js
+  ...
+  wiki/.wiki-kit/scripts/commands/lint.js
+init: no .github/ or Jenkinsfile found — wire the gate into your CI manually:
+  make -C wiki lint
+  make -C wiki affected-strict
+
+Wiki root: /path/to/your/repo/wiki
+```
+
+What you get:
+
+- `wiki/docs/` — a Docusaurus site, five starter sections (`getting-started`, `guides`,
+  `architecture`, `reference`, `contributing`), and a home page you're expected to rewrite.
+- `wiki/wiki-kit.config.yaml` — rules, OKF types, output artifacts (see **Configuration**).
+- `wiki/.wiki-kit/scripts/` — a private copy of the verification engine. This is what your CI
+  actually calls — see **How CI uses this**.
+- `.claude/agents/wiki.md` — a standalone subagent that can do the **Updating docs after a
+  change** workflow below without this skill being loaded, e.g. as a delegated task.
+- A CI file, picked automatically: `.github/workflows/wiki.yml` if `.github/` exists,
+  `Jenkinsfile.wiki` if there's a `Jenkinsfile` (wire its two stages into the real one), or —
+  like above — the two manual commands to add yourself.
+
+Running `init` again is safe: unchanged files are left alone, and a hand-edited file makes it
+stop and ask before overwriting (or fails naming `--force`, non-interactively).
+
+## Writing a page
+
+```yaml
+---
+title: "Auth: sessions"
+description: How session creation and logout work.
+type: Architecture
+sources:
+  - resource: src/auth/*.go
+generated: { by: human:you, at: 2026-09-25 }
+---
+```
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `title` | yes (or a `#` heading) | |
+| `type` | yes | the only field OKF requires — `Architecture`, `Guide`, `Reference`, `Runbook`, `Concept` |
+| `sources` | in `architecture/` and `reference/` | globs at subsystem granularity, e.g. `src/auth/*.go`, not one entry per file |
+| `generated` | recommended | `human:<id>` or `<model>/<version>` |
+| `verified` | see below | `{by, at}` pairs — who checked it against the code |
+
+Full conventions (how to structure a page, what "good" looks like, the limits of git-based
+staleness) live in `wiki/AUTHORING.md` — this table is just the front matter.
+
+## Checking health
+
+```bash
+node wiki-kit/scripts/commands/lint.js
+```
+
+Against a repo with one clean page:
+
+```
+1 pages · 0 error(s) · 0 warning(s)
+```
+
+Against one with a stale front matter and a broken link:
+
+```
+✗ wiki/docs/guides/deploy.md: broken link: `./old-page.md`
+! wiki/docs/architecture/auth.md: sources changed after the page: src/auth/session.go
+
+2 pages · 1 error(s) · 1 warning(s)
+```
+
+`✗` is an error (fails the command). `!` is a warning (doesn't, unless `--strict`):
+
+```bash
+node wiki-kit/scripts/commands/lint.js --strict   # warnings fail too — what CI uses
+```
+
+11 rules run by default — front matter shape, `sources:` presence and existence, staleness,
+`stale_after` expiry, unverified agent-written pages, orphaned pages, a monorepo workspace trap,
+and broken relative links. The full, authoritative list is `wiki-kit/scripts/core/lint-rules.js`'s
+`RULES` array.
+
+## What a diff affects
+
+```bash
+node wiki-kit/scripts/commands/affected.js --base <ref>
+```
+
+Base resolves itself from whatever CI sets (`GITHUB_BASE_REF`, `CHANGE_TARGET`, ...) — pass
+`--base` only to override, e.g. when running it locally.
+
+A diff that touched a documented file:
+
+```
+diff base...HEAD — 1 file(s)
+
+Pages to update:
+  architecture/auth.md  ← src/auth/session.go
+```
+
+A diff that also touched a file no page claims:
+
+```
+diff base...HEAD — 3 file(s)
+
+Pages to update:
+  architecture/auth.md  ← src/auth/session.go
+
+Not covered (no page declares these sources):
+  src/billing/refunds.go
+
+→ new functionality needs a new page, or `sources:` added to an existing page.
+```
+
+`--strict` is the actual CI gate — it fails when a page's declared sources changed but the page
+itself wasn't touched in the same diff:
+
+```bash
+$ node wiki-kit/scripts/commands/affected.js --base base --strict
+diff base...HEAD — 1 file(s)
+
+Pages to update:
+  architecture/auth.md  ← src/auth/session.go
+
+1 page(s) declare sources that changed and were not updated:
+    wiki/docs/architecture/auth.md
+
+→ update the page(s) above to reflect the change.
+$ echo $?
+1
+```
+
+Update the page in the same commit/PR and the same command exits `0`.
+
+## Updating docs after a change
+
+This is a skill workflow, not a script — ask Claude ("update the wiki for this change") and it
+will: run `affected`, read the real diff for each listed file (never guess from the file list
+alone), edit the pages to describe **behavior** not the diff, and for anything under "Not
+covered" propose rather than silently create a page. It sets `generated: { by, at }` on every
+page it touches and deliberately leaves `verified:` alone — that's for whoever reviews the PR.
+
+Outside a live session, `.claude/agents/wiki.md` (written by `init`) is the same workflow
+packaged as a standalone subagent.
+
+## Regenerating the agent-readable layer
+
+```bash
+node wiki-kit/scripts/commands/llms.js
+```
+
+```
+llms.txt       0.3 KB  (1 pages)
+llms-full.txt  0.7 KB
+map.json       1 files mapped
+okf/           conformant bundle
+```
+
+`llms.txt` is a curated index — small enough to hand an agent directly:
+
+```
+# Acme
+
+> Payments API
+
+Handles checkout and refunds.
+
+Each page below is a markdown file served alongside the site: swap the extension for `.md` to read the raw content. The full body of everything is in `llms-full.txt`.
+
+## Architecture
+
+* [Auth: sessions](/architecture/auth) - How session creation and logout work.
+```
+
+`llms-full.txt` is the same, uncurated and complete. `map.json` is the reverse index — "what
+documents this file" — for an agent to consult before touching code. Only the artifacts listed
+in `output.artifacts` (config) get written.
+
+## Sharing across repos (hub push)
+
+For repos that opted into a hub during `init` (a `hub:` block in `wiki-kit.config.yaml`):
+
+```bash
+export WIKI_HUB_TOKEN=ghp_...   # write-scoped token for the hub repo
+node wiki-kit/scripts/commands/llms.js    # artifacts must exist first
+node wiki-kit/scripts/commands/hub.js
+```
+
+```
+Pushed docs/<repo-name> to acme/knowledge-hub@main.
+```
+
+It clones the hub, copies this repo's artifacts under `docs/<repo-name>/`, commits, and pushes.
+A rejected push (another repo wrote to the hub at the same time) fails directly — no retry, no
+rebase; re-run after checking the hub's history. The hub is just another wiki-kit repo: its own
+`llms` run builds the unified index across every repo that's pushed into it.
+
+This is a real commit + push, deliberately never a git submodule — a submodule was tried and
+found to silently break staleness detection and defeat the same-PR CI gate.
+
+## How CI uses this
+
+`init` vendors the whole verification engine into `wiki/.wiki-kit/scripts/` — your CI never
+depends on this skill, npm, or a network connection. The `wiki/Makefile` `init` writes is the
+one indirection point everything else goes through:
+
+```
+make -C wiki lint             # errors fail; warnings don't
+make -C wiki strict            # warnings fail too
+make -C wiki affected           # what changed, vs $BASE (default origin/main)
+make -C wiki affected-strict     # the CI gate
+make -C wiki llms                 # regenerate the agent layer
+make -C wiki build                  # build the Docusaurus site (needs npm — the only step that does)
+```
+
+The shipped `.github/workflows/wiki.yml` and `Jenkinsfile.wiki` templates call exactly these
+targets.
+
+## Configuration
+
+`wiki/wiki-kit.config.yaml`, written by `init`:
+
+```yaml
+rules:
+  sources-present: { severity: error, apply-to: [architecture, reference] }
+  staleness:       { severity: warn }
+  unverified:      { severity: warn }
+  workspace-absorbed: { severity: warn }
+okf:
+  types: [Architecture, Guide, Reference, Runbook, Concept]
+output:
+  dir: static
+  artifacts: [llms, llms-full, map, okf]
+  llms-max-kb: 8
+hub:               # only present if init's hub question was answered yes
+  repo: acme/knowledge-hub
+  branch: main
+```
+
+Any rule can be set to `off`. The legitimate way to exempt one page from a rule is adjusting its
+`sources:` — never turning off the rule to make a specific page pass.
+
+## Why zero dependencies
+
+`lint`, `affected`, and `llms` run on Node's standard library alone — no packages, no
+`node_modules`. That's what makes the gate free to drop into a Go, PHP, or Python repo:
+verification costs nothing; only building the Docusaurus site does, and only when the wiki
+itself changed.

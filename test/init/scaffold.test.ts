@@ -59,6 +59,24 @@ describe("scaffold", () => {
     expect(index).toContain("acme-app");
   });
 
+  it("vendors the verification engine into wiki/.wiki-kit/scripts/ so CI never needs the skill again", async () => {
+    const result = await scaffold(repoRoot, ANSWERS, { force: false });
+
+    for (const rel of [
+      "wiki/.wiki-kit/scripts/core/pages.js",
+      "wiki/.wiki-kit/scripts/core/lint-rules.js",
+      "wiki/.wiki-kit/scripts/commands/lint.js",
+      "wiki/.wiki-kit/scripts/commands/affected.js",
+      "wiki/.wiki-kit/scripts/commands/llms.js",
+      "wiki/.wiki-kit/scripts/commands/hub.js",
+      "wiki/.wiki-kit/package.json",
+    ]) {
+      expect(result.written).toContain(rel);
+      expect(existsSync(join(repoRoot, ...rel.split("/")))).toBe(true);
+    }
+    expect(existsSync(join(repoRoot, "wiki", ".wiki-kit", "scripts", "init"))).toBe(false);
+  });
+
   it("selects the github CI file when .github/ exists", async () => {
     mkdirSync(join(repoRoot, ".github"));
     const result = await scaffold(repoRoot, ANSWERS, { force: false });

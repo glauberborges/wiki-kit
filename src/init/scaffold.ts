@@ -4,11 +4,14 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { selectCi } from "./ci-select.js";
 import { substitutePlaceholders, type InitAnswers as PlaceholderAnswers } from "./placeholders.js";
-import type { HubAnswer } from "./prompts.js";
 
-// placeholders.ts and prompts.ts each define their own narrow InitAnswers —
-// scaffold needs both (the 7 template tokens AND the hub decision), so this
-// combines them instead of importing either name directly.
+export interface HubAnswer {
+  repo: string;
+  branch: string;
+}
+
+// placeholders.ts defines the 7 template tokens; scaffold also needs the hub
+// decision, so this combines them instead of extending an unrelated module.
 export interface ScaffoldAnswers extends PlaceholderAnswers {
   hub?: HubAnswer | null;
 }
@@ -28,11 +31,33 @@ interface PlanEntry {
   content: string;
 }
 
-function resolveTemplatesRoot(): string {
-  // Both dist/init/scaffold.js and src/init/scaffold.ts (under vitest) sit two
-  // levels below the package root, so the same relative offset resolves either way.
-  return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "templates");
+/**
+ * Locates a sibling directory of this skill's package root (`wiki-kit/`),
+ * e.g. `assets` or `scripts`. Two distinct runtime shapes resolve here:
+ *
+ * - Compiled, wherever the skill is installed: this file is
+ *   `wiki-kit/scripts/init/scaffold.js` — the package root is two levels up.
+ * - Dev/test, running `src/init/scaffold.ts` straight under vitest (never
+ *   built): the package root is two levels up from `src/init`, i.e. this
+ *   repo's own root, with `wiki-kit/` one level further in.
+ *
+ * Checking both and taking whichever exists avoids hardcoding which one is
+ * live — `npm test`'s `pretest` build means both exist for tests, but only
+ * the first candidate exists once this skill is copied elsewhere for real.
+ */
+function resolvePackageDir(name: "assets" | "scripts"): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const compiled = join(here, "..", "..", name);
+  if (existsSync(compiled)) return compiled;
+  const dev = join(here, "..", "..", "wiki-kit", name);
+  if (existsSync(dev)) return dev;
+  throw new Error(`${name}/ not found near ${here} (checked ${compiled} and ${dev}) — run \`npm run build\`?`);
 }
+
+// The verification engine (core/) plus the 4 commands a target repo runs
+// standalone. init/ is left out on purpose — detect-stack, ci-select and
+// scaffold itself are only needed to run `init`, never again afterward.
+const VERIFICATION_SCRIPT_DIRS = ["core", "commands"];
 
 function walkFiles(dir: string): string[] {
   const out: string[] = [];
@@ -65,28 +90,23 @@ function buildPlan(
   answers: ScaffoldAnswers,
   ci: "github" | "jenkins" | "manual",
 ): PlanEntry[] {
-  const templatesRoot = resolveTemplatesRoot();
+  const assetsRoot = resolvePackageDir("assets");
   const entries: PlanEntry[] = [];
 
-  const wikiTemplateRoot = join(templatesRoot, "wiki");
-  for (const absSrc of walkFiles(wikiTemplateRoot)) {
-    const rel = relative(wikiTemplateRoot, absSrc);
-    // npm's packer hardcodes .gitignore/.npmignore out of every published
-    // tarball, `files` allowlist or not — the template ships dotless as
-    // `gitignore` and is renamed back here, the standard workaround for that
-    // npm limitation. Confirmed by extracting a real `npm pack` tarball.
-    const targetRel = rel === "gitignore" ? ".gitignore" : rel;
-    const absTarget = join(repoRoot, "wiki", targetRel);
+  const wikiAssetRoot = join(assetsRoot, "wiki");
+  for (const absSrc of walkFiles(wikiAssetRoot)) {
+    const rel = relative(wikiAssetRoot, absSrc);
+    const absTarget = join(repoRoot, "wiki", rel);
     entries.push(makeEntry(repoRoot, absTarget, renderFile(absSrc, answers, rel)));
   }
 
-  const agentSrc = join(templatesRoot, "claude", "agents", "wiki.md");
+  const agentSrc = join(assetsRoot, "claude", "agents", "wiki.md");
   entries.push(
     makeEntry(repoRoot, join(repoRoot, ".claude", "agents", "wiki.md"), renderFile(agentSrc, answers)),
   );
 
   if (ci === "github") {
-    const src = join(templatesRoot, "github", "wiki.yml");
+    const src = join(assetsRoot, "github", "wiki.yml");
     entries.push(
       makeEntry(
         repoRoot,
@@ -95,10 +115,36 @@ function buildPlan(
       ),
     );
   } else if (ci === "jenkins") {
-    const src = join(templatesRoot, "jenkins", "Jenkinsfile.wiki");
+    const src = join(assetsRoot, "jenkins", "Jenkinsfile.wiki");
     entries.push(makeEntry(repoRoot, join(repoRoot, "Jenkinsfile.wiki"), renderFile(src, answers)));
   }
 
+  entries.push(...collectScriptEntries(repoRoot));
+
+  return entries;
+}
+
+/** Vendors the verification engine into `wiki/.wiki-kit/scripts/` — no placeholder rendering, copied as-is. */
+function collectScriptEntries(repoRoot: string): PlanEntry[] {
+  const scriptsRoot = resolvePackageDir("scripts");
+  const entries: PlanEntry[] = [];
+  for (const dir of VERIFICATION_SCRIPT_DIRS) {
+    const absDir = join(scriptsRoot, dir);
+    if (!existsSync(absDir)) {
+      throw new Error(`${absDir} not found — run \`npm run build\` before scaffolding a wiki.`);
+    }
+    for (const absSrc of walkFiles(absDir)) {
+      const rel = relative(scriptsRoot, absSrc);
+      const absTarget = join(repoRoot, "wiki", ".wiki-kit", "scripts", rel);
+      entries.push(makeEntry(repoRoot, absTarget, readFileSync(absSrc, "utf8")));
+    }
+  }
+  // Marks this subtree as ESM regardless of wiki/package.json (Docusaurus's,
+  // which has no "type" field) — without it, Node falls back to reparsing
+  // these .js files with a perf-cost warning on every single invocation.
+  entries.push(
+    makeEntry(repoRoot, join(repoRoot, "wiki", ".wiki-kit", "package.json"), '{\n  "type": "module"\n}\n'),
+  );
   return entries;
 }
 
