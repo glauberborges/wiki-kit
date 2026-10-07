@@ -14,7 +14,7 @@ export interface Page {
   category: string;
   categoryLabel: string;
   categoryPosition: number;
-  reserved: boolean; // index.md / log.md
+  reserved: boolean; // index / log, either extension
   data: Record<string, unknown>;
   body: string;
   rawHead: string; // unparsed front-matter block, used by yaml-safe
@@ -30,7 +30,10 @@ interface CategoryMeta {
 }
 
 /** Page names reserved by the OKF (not concept documents). */
-const RESERVED = new Set(["index.md", "log.md"]);
+const RESERVED = new Set(["index.md", "index.mdx", "log.md", "log.mdx"]);
+
+/** `.md` (Docusaurus) and `.mdx` (Mintlify) are both pages — see AD on engine support. */
+const PAGE_EXTENSIONS = [".md", ".mdx"];
 
 /**
  * Walks up from `cwd` to the nearest `.git` entry. A linked worktree's
@@ -56,7 +59,7 @@ function walk(dir: string): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walk(full));
-    else if (entry.name.endsWith(".md")) out.push(full);
+    else if (PAGE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) out.push(full);
   }
   return out;
 }
@@ -106,7 +109,7 @@ export function loadPages(wikiDir: string): Page[] {
       file,
       rel,
       repoRel: path.relative(repoRoot, file).split(path.sep).join("/"),
-      slug: rel.replace(/\.md$/, ""),
+      slug: rel.replace(/\.mdx?$/, ""),
       category,
       categoryLabel: meta?.label ?? (category === "." ? "" : category),
       categoryPosition: meta?.position ?? (category === "." ? 0 : 999),
@@ -114,7 +117,7 @@ export function loadPages(wikiDir: string): Page[] {
       data,
       body,
       rawHead,
-      title: (data.title as string | undefined) ?? firstHeading(body) ?? path.basename(rel, ".md"),
+      title: (data.title as string | undefined) ?? firstHeading(body) ?? path.basename(rel, path.extname(rel)),
       description: (data.description as string | undefined) ?? "",
       sources: normalizeSources(data.sources),
       position: (data.sidebar_position as number | undefined) ?? 999,

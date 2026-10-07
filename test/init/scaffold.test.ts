@@ -26,6 +26,7 @@ const ANSWERS: ScaffoldAnswers = {
   searchLang: "en",
   tagline: "Docs that verify themselves",
   taglineLong: "Docs that verify themselves against the code they describe",
+  engine: "docusaurus",
 };
 
 beforeEach(() => {
@@ -84,6 +85,22 @@ describe("scaffold", () => {
     expect(result.ci).toBe("github");
     expect(result.written).toContain(".github/workflows/wiki.yml");
     expect(existsSync(join(repoRoot, ".github", "workflows", "wiki.yml"))).toBe(true);
+  });
+
+  it("scaffolds the Mintlify tree instead when engine: 'mintlify' is chosen", async () => {
+    mkdirSync(join(repoRoot, ".github"));
+    const result = await scaffold(repoRoot, { ...ANSWERS, engine: "mintlify" }, { force: false });
+
+    expect(result.written).toContain("wiki/docs.json");
+    expect(result.written).toContain("wiki/docs/index.mdx");
+    expect(result.written).not.toContain("wiki/docusaurus.config.js");
+    expect(result.written).not.toContain("wiki/docs/index.md");
+
+    const docsJson = JSON.parse(readFileSync(join(repoRoot, "wiki", "docs.json"), "utf8"));
+    expect(docsJson.name).toBe("acme-app");
+
+    const ciYaml = readFileSync(join(repoRoot, ".github", "workflows", "wiki.yml"), "utf8");
+    expect(ciYaml).not.toContain("Build the site");
   });
 
   it("selects the jenkins CI file when Jenkinsfile exists and .github/ doesn't", async () => {

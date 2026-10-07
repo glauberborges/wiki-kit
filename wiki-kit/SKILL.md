@@ -1,6 +1,6 @@
 ---
 name: wiki-kit
-description: Keeps a repository's documentation verifiably in sync with its code. Each wiki page's front matter declares which source files it documents (sources:), so staleness, "what does this diff affect", and a CI gate are all computed deterministically from git — no LLM needed to verify. Use when setting up a docs wiki that tracks source files, checking whether docs are stale, finding which pages a code change affects, updating wiki pages after a change, or sharing a docs index across repos via a hub.
+description: Keeps a repository's documentation verifiably in sync with its code. Each wiki page's front matter declares which source files it documents (sources:), so staleness, "what does this diff affect", and a CI gate are all computed deterministically from git — no LLM needed to verify. Use when setting up a docs wiki from scratch, checking whether docs are stale, updating docs for a PR or diff, adding a new documented page or section (even for existing, previously undocumented code), or sharing a docs index across repos via a hub.
 compatibility: Requires git and Node.js 20+ on PATH. Network access only for `hub.js` (push to a configured hub repo).
 allowed-tools: Bash(node:*) Bash(git:*) Bash(make:*)
 ---
@@ -26,10 +26,16 @@ forever. Only *writing* pages needs an agent, and that's this skill's other job.
 
 ## Which workflow
 
-- No `wiki/wiki-kit.config.yaml` in this repo yet → **Init**.
+Three different things get asked of this skill — tell them apart by what's actually being
+requested, not only by whether `wiki/wiki-kit.config.yaml` exists:
+
+- **Starting from nothing** — "set up docs for this repo", no wiki exists yet → **Init**.
+- **Catching the docs up to code that already changed** — "update the docs for this PR/diff",
+  "what does my change affect" → **What a diff affects**, then **Update pages**.
+- **An explicit, standalone ask to document something** — "document X", "add a page about Y" —
+  not necessarily tied to any diff, often about code that's existed for a while and was never
+  written up → **Add a new page**.
 - "Is the wiki healthy / does CI pass?" → **Check health**.
-- "What does my change affect?" / preparing a PR → **What a diff affects**.
-- "Update the docs for what I just changed" → **Update pages**.
 - Sharing this repo's docs index into a central hub → **Hub push**.
 
 All scripts live under `scripts/` in this skill and take the target repo's `wiki/` as their
@@ -38,12 +44,24 @@ as git itself). Run them with `node`, e.g. `node scripts/commands/lint.js`.
 
 ## Init
 
-Scaffolds a new wiki: `wiki/docs/`, `wiki-kit.config.yaml`, `AUTHORING.md`, a Docusaurus site,
-`.claude/agents/wiki.md`, a CI file, and the vendored verification scripts.
+Scaffolds a new wiki: `wiki/docs/`, `wiki-kit.config.yaml`, `AUTHORING.md`, a site (Docusaurus
+or Mintlify), `.claude/agents/wiki.md`, a CI file, and the vendored verification scripts.
 
-**1. Ask the user** (don't guess): project name, GitHub org/owner, docs locale (default `en`),
-and whether to connect this wiki to a hub repo (see **Hub push**) — if yes, also its
-`owner/name` and branch (default `main`).
+**1. Ask the user** (don't guess):
+
+- Project name and GitHub org/owner.
+- Which doc engine — **Docusaurus** (default, self-hosted static site, `.md` pages, explicit
+  `make build`) or **Mintlify** (hosted, deploys on push to the default branch with no local
+  build, `.mdx` pages, needs `npm i -g mint` only to preview locally). These are the only two
+  engines with an asset tree (`assets/wiki-docusaurus/`, `assets/wiki-mintlify/`) — if the user
+  names a third one, say so plainly and ask whether to proceed with Docusaurus (the default) or
+  stop, never silently scaffold either engine after they asked for something else.
+- Docs locale (default `en`).
+- Whether to connect this wiki to a hub repo (see **Hub push**) — if yes, also its
+  `owner/name` and branch (default `main`).
+- Whatever else the repo's own context makes relevant (e.g. a tagline, since `--tagline` and
+  `--tagline-long` have no default and the script fails naming them if missing — ask rather
+  than invent marketing copy).
 
 **2. Run the script** with what you gathered:
 
@@ -51,16 +69,18 @@ and whether to connect this wiki to a hub repo (see **Hub push**) — if yes, al
 node scripts/commands/init.js \
   --project "Acme API" --org acme --tagline "Payments API" \
   --tagline-long "Handles checkout and refunds." \
+  [--engine docusaurus|mintlify] \
   [--locale en] [--repo <dir-name-default>] [--hub-repo owner/hub] [--hub-branch main] [--force]
 ```
 
-`--tagline` and `--tagline-long` have no default — the script fails naming the missing flag if
-you don't have them; ask the user rather than inventing marketing copy.
+`--engine` defaults to `docusaurus` when omitted.
 
 It detects the stack from whatever manifest it finds (`go.mod`, `composer.json`,
 `package.json`, `pyproject.toml`, ...) and picks a CI file: `.github/workflows/wiki.yml` if
 `.github/` exists, `Jenkinsfile.wiki` if there's a `Jenkinsfile` (wire its two gate stages into
-the existing pipeline), or it prints the two manual commands otherwise.
+the existing pipeline), or it prints the two manual commands otherwise. The CI file's content
+(whether it has a "build the site" job) also follows the chosen engine — Mintlify has none,
+since deployment happens outside this CI entirely.
 
 **3. Idempotent** — running it again makes no changes if nothing drifted. If a file was hand-
 edited since, it lists the conflicts and stops; pass `--force` only if the user confirms
@@ -91,7 +111,10 @@ wasn't touched in the same diff — code moved on without its docs.
 
 ## Update pages
 
-Run **What a diff affects** first, then:
+Catches the docs up to code that already changed — e.g. "update the docs for this PR". Run
+**What a diff affects** first (if the change is an open PR rather than the current branch's
+diff, get that diff with `gh pr diff <number>` or `git diff <base>...<pr-branch>` and use that
+as the file list), then:
 
 1. For each page listed under "Pages to update": read the actual diff (`git diff
    <base>...HEAD -- <files>`) to understand what changed — don't guess from the file list.
@@ -103,11 +126,43 @@ Run **What a diff affects** first, then:
    worse than leaving it on.
 3. For files under "Not covered": **propose**, don't create — a new file with no page might
    need a new page, might extend an existing one, or might be an internal detail that never
-   needed documenting. Ask before writing.
+   needed documenting. Ask before writing (or see **Add a new page** once they decide).
 4. Run **Check health** and fix whatever it reports.
 
 Writing conventions live in the target repo's `wiki/AUTHORING.md` (installed by init) — read
 it before writing prose, it's more detailed than this summary.
+
+## Add a new page
+
+An explicit, standalone ask to document something — "document the retry logic", "add a page
+about X" — not driven by any diff. Often about code that's existed for a while and was simply
+never written up, so **What a diff affects** won't surface it.
+
+**1. Ask the user** (don't guess):
+
+- Which section it belongs in — `architecture/` or `reference/` (needs `sources:`),
+  `guides/`, `getting-started/`, or `contributing/` (don't). The target repo's
+  `wiki/AUTHORING.md` has the full table if the categories aren't obvious from the subject.
+- Whether this extends an existing page or deserves a new one — check the existing pages'
+  `sources:` and content first (grep `wiki/docs/`) and propose an answer rather than assuming;
+  one page covering two subjects that change for different reasons should split instead.
+
+**2. Determine the sources, don't ask for an enumeration.** Read the actual code to find which
+files the subject lives in — a glob at subsystem granularity (`src/auth/*.go`, not one entry
+per file). Confirm the list with the user only if the codebase doesn't make it obvious.
+
+**3. Write the page** following `wiki/AUTHORING.md`'s conventions: required front matter
+(`title`, `type`, `sources` if applicable), a "Where it lives in the code" table for
+architecture/reference pages, behavior described from reading the code — never invented. Set
+`generated: { by, at }`, never `verified:`.
+
+**4. Link it.** Always add it to `wiki/docs/index.md`'s (or `index.mdx`'s) "Where to start"
+table. **On Mintlify** (`wiki/docs.json` exists), also add the page to the right group in
+`navigation.groups[].pages` — Mintlify's nav is explicit, not autogenerated, so skipping this
+makes the page invisible on the site even though `lint`/`llms` see it fine. **On Docusaurus**
+no second edit is needed — its sidebar is autogenerated per directory.
+
+**5.** Run **Check health** and fix whatever it reports.
 
 ## Regenerate the agent-readable layer
 
@@ -168,6 +223,6 @@ adjusting its `sources:` — never turning off the rule to make a specific page 
 - Never fabricate documentation. If the diff doesn't make behavior clear and the code doesn't
   answer it, say so instead of writing something plausible — invented documentation costs the
   credibility of every other page.
-- Never stamp `verified:` yourself — see **Update pages**, step 2.
+- Never stamp `verified:` yourself — see **Update pages** step 2 or **Add a new page** step 3.
 - These scripts only ever write inside `wiki/`, `.claude/agents/wiki.md`, and the one CI file
   init selected. Nothing else in the target repo.

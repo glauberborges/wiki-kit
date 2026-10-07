@@ -5,7 +5,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { readFrontMatter, splitFrontMatter } from "./frontmatter.js";
 /** Page names reserved by the OKF (not concept documents). */
-const RESERVED = new Set(["index.md", "log.md"]);
+const RESERVED = new Set(["index.md", "index.mdx", "log.md", "log.mdx"]);
+/** `.md` (Docusaurus) and `.mdx` (Mintlify) are both pages — see AD on engine support. */
+const PAGE_EXTENSIONS = [".md", ".mdx"];
 /**
  * Walks up from `cwd` to the nearest `.git` entry. A linked worktree's
  * `.git` is a *file* holding a `gitdir:` pointer, not a directory — plain
@@ -29,7 +31,7 @@ function walk(dir) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory())
             out.push(...walk(full));
-        else if (entry.name.endsWith(".md"))
+        else if (PAGE_EXTENSIONS.some((ext) => entry.name.endsWith(ext)))
             out.push(full);
     }
     return out;
@@ -77,7 +79,7 @@ export function loadPages(wikiDir) {
             file,
             rel,
             repoRel: path.relative(repoRoot, file).split(path.sep).join("/"),
-            slug: rel.replace(/\.md$/, ""),
+            slug: rel.replace(/\.mdx?$/, ""),
             category,
             categoryLabel: meta?.label ?? (category === "." ? "" : category),
             categoryPosition: meta?.position ?? (category === "." ? 0 : 999),
@@ -85,7 +87,7 @@ export function loadPages(wikiDir) {
             data,
             body,
             rawHead,
-            title: data.title ?? firstHeading(body) ?? path.basename(rel, ".md"),
+            title: data.title ?? firstHeading(body) ?? path.basename(rel, path.extname(rel)),
             description: data.description ?? "",
             sources: normalizeSources(data.sources),
             position: data.sidebar_position ?? 999,

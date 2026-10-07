@@ -10,10 +10,15 @@ export interface HubAnswer {
   branch: string;
 }
 
+/** The only two asset trees that actually exist under `assets/wiki-<engine>/`. */
+export type DocEngine = "docusaurus" | "mintlify";
+
 // placeholders.ts defines the 7 template tokens; scaffold also needs the hub
-// decision, so this combines them instead of extending an unrelated module.
+// decision and the doc engine, so this combines them instead of extending an
+// unrelated module.
 export interface ScaffoldAnswers extends PlaceholderAnswers {
   hub?: HubAnswer | null;
+  engine: DocEngine;
 }
 
 export interface ScaffoldResult {
@@ -93,7 +98,7 @@ function buildPlan(
   const assetsRoot = resolvePackageDir("assets");
   const entries: PlanEntry[] = [];
 
-  const wikiAssetRoot = join(assetsRoot, "wiki");
+  const wikiAssetRoot = join(assetsRoot, `wiki-${answers.engine}`);
   for (const absSrc of walkFiles(wikiAssetRoot)) {
     const rel = relative(wikiAssetRoot, absSrc);
     const absTarget = join(repoRoot, "wiki", rel);
@@ -105,8 +110,11 @@ function buildPlan(
     makeEntry(repoRoot, join(repoRoot, ".claude", "agents", "wiki.md"), renderFile(agentSrc, answers)),
   );
 
+  // Target filenames stay the same regardless of engine (.github/workflows/wiki.yml,
+  // Jenkinsfile.wiki) — only the source template differs, same as the wiki-<engine>
+  // asset tree above.
   if (ci === "github") {
-    const src = join(assetsRoot, "github", "wiki.yml");
+    const src = join(assetsRoot, "github", `wiki-${answers.engine}.yml`);
     entries.push(
       makeEntry(
         repoRoot,
@@ -115,7 +123,7 @@ function buildPlan(
       ),
     );
   } else if (ci === "jenkins") {
-    const src = join(assetsRoot, "jenkins", "Jenkinsfile.wiki");
+    const src = join(assetsRoot, "jenkins", `Jenkinsfile.${answers.engine}.wiki`);
     entries.push(makeEntry(repoRoot, join(repoRoot, "Jenkinsfile.wiki"), renderFile(src, answers)));
   }
 

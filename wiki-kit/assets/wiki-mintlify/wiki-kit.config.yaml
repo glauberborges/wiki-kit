@@ -1,0 +1,14 @@
+rules:
+  sources-present: { severity: error, apply-to: [architecture, reference] }
+  staleness:       { severity: warn }
+  unverified:      { severity: warn }
+  workspace-absorbed: { severity: warn }
+okf:
+  types: [Architecture, Guide, Reference, Runbook, Concept]
+output:
+  # Generated, not necessarily web-served — Mintlify has no confirmed
+  # equivalent of Docusaurus's static/ passthrough. The files are correct
+  # either way; publishing them on the hosted site is a separate step.
+  dir: static
+  artifacts: [llms, llms-full, map, okf]
+  llms-max-kb: 8

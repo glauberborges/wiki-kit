@@ -153,6 +153,42 @@ describe("loadPages", () => {
   });
 });
 
+describe("loadPages — .mdx (Mintlify) support", () => {
+  let repoRoot: string;
+  let wikiDir: string;
+
+  beforeEach(() => {
+    repoRoot = mkdtempSync(join(tmpdir(), "wiki-kit-pages-mdx-"));
+    wikiDir = join(repoRoot, "wiki");
+    const docsDir = join(wikiDir, "docs");
+    mkdirSync(join(docsDir, "architecture"), { recursive: true });
+
+    writeFileSync(join(docsDir, "index.mdx"), ["---", "title: Home", "---", "", "Welcome.", ""].join("\n"));
+    writeFileSync(
+      join(docsDir, "architecture", "overview.mdx"),
+      ["---", "type: Architecture", "sources:", "  - resource: src/**/*.ts", "---", "", "Body.", ""].join("\n"),
+    );
+  });
+
+  afterEach(() => {
+    rmSync(repoRoot, { recursive: true, force: true });
+  });
+
+  it("discovers .mdx pages alongside .md ones", () => {
+    expect(loadPages(wikiDir)).toHaveLength(2);
+  });
+
+  it("strips .mdx (not just .md) from the slug", () => {
+    const pages = loadPages(wikiDir);
+    expect(pages.find((p) => p.rel === "architecture/overview.mdx")?.slug).toBe("architecture/overview");
+  });
+
+  it("marks index.mdx as reserved, same as index.md", () => {
+    const pages = loadPages(wikiDir);
+    expect(pages.find((p) => p.rel === "index.mdx")?.reserved).toBe(true);
+  });
+});
+
 function initGitRepo(dir: string): void {
   execFileSync("git", ["init", "-q"], { cwd: dir });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });

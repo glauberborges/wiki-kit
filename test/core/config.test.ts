@@ -48,10 +48,18 @@ describe("loadConfig", () => {
     expect(loadConfig(wikiDir).hub).toEqual({ repo: "acme/wiki-hub", branch: "main" });
   });
 
-  it("loads the shipped template config unmodified", () => {
+  it("loads the shipped Docusaurus template config unmodified", () => {
     const templatePath = join(
       dirname(fileURLToPath(import.meta.url)),
-      "../../wiki-kit/assets/wiki",
+      "../../wiki-kit/assets/wiki-docusaurus",
+    );
+    expect(() => loadConfig(templatePath)).not.toThrow();
+  });
+
+  it("loads the shipped Mintlify template config unmodified", () => {
+    const templatePath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../wiki-kit/assets/wiki-mintlify",
     );
     expect(() => loadConfig(templatePath)).not.toThrow();
   });

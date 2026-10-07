@@ -55,6 +55,22 @@ describe("siteMeta", () => {
     writeFileSync(join(wikiDir, "docusaurus.config.js"), "module.exports = {\n  title: `Only Title`,\n};\n");
     expect(siteMeta(wikiDir)).toEqual({ title: "Only Title", tagline: "" });
   });
+
+  it("reads title from docs.json's name when there's no docusaurus.config.js (Mintlify)", () => {
+    writeFileSync(join(wikiDir, "docs.json"), JSON.stringify({ name: "Acme Wiki" }));
+    expect(siteMeta(wikiDir)).toEqual({ title: "Acme Wiki", tagline: "" });
+  });
+
+  it("prefers docusaurus.config.js over docs.json when both exist", () => {
+    writeFileSync(join(wikiDir, "docusaurus.config.js"), "module.exports = {\n  title: 'Docusaurus Wins',\n};\n");
+    writeFileSync(join(wikiDir, "docs.json"), JSON.stringify({ name: "Mintlify Loses" }));
+    expect(siteMeta(wikiDir)).toEqual({ title: "Docusaurus Wins", tagline: "" });
+  });
+
+  it("falls back to the generic default on malformed docs.json", () => {
+    writeFileSync(join(wikiDir, "docs.json"), "{not json");
+    expect(siteMeta(wikiDir)).toEqual({ title: "Wiki", tagline: "" });
+  });
 });
 
 describe("summarize", () => {
@@ -378,6 +394,28 @@ describe("writeArtifacts", () => {
       expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
+    }
+  });
+
+  it("writes the okf/ bundle even when the only page is the reserved index", () => {
+    // Regression: writeOkfBundle used to rely on a non-reserved page's own
+    // mkdirSync call to create okfDir as a side effect — a wiki with only
+    // index.md/.mdx (e.g. straight after a fresh `init`, before any other
+    // page exists) never ran that side effect, so the writeFileSync calls
+    // for okf/index.md and okf/log.md threw ENOENT.
+    const onlyIndexRepo = mkdtempSync(join(tmpdir(), "wiki-kit-llms-onlyindex-"));
+    try {
+      initGitRepo(onlyIndexRepo);
+      const onlyIndexWiki = join(onlyIndexRepo, "wiki");
+      mkdirSync(join(onlyIndexWiki, "docs"), { recursive: true });
+      writeFileSync(join(onlyIndexWiki, "docs", "index.md"), ["---", "title: Home", "---", "", "Welcome.", ""].join("\n"));
+
+      const pages = loadPages(onlyIndexWiki);
+      expect(() => writeArtifacts(pages, onlyIndexWiki, onlyIndexRepo, config)).not.toThrow();
+      expect(existsSync(join(onlyIndexWiki, "static", "okf", "index.md"))).toBe(true);
+      expect(existsSync(join(onlyIndexWiki, "static", "okf", "log.md"))).toBe(true);
+    } finally {
+      rmSync(onlyIndexRepo, { recursive: true, force: true });
     }
   });
 });

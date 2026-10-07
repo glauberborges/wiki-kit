@@ -134,6 +134,29 @@ describe("wiki-kit init", () => {
     expect(config).not.toContain("hub:");
   });
 
+  it("defaults to the Docusaurus engine when --engine is omitted", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await run(BASE_FLAGS);
+
+    expect(existsSync(join(repoRoot, "wiki", "docusaurus.config.js"))).toBe(true);
+  });
+
+  it("scaffolds Mintlify instead when --engine mintlify is passed", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await run([...BASE_FLAGS, "--engine", "mintlify"]);
+
+    expect(existsSync(join(repoRoot, "wiki", "docs.json"))).toBe(true);
+    expect(existsSync(join(repoRoot, "wiki", "docusaurus.config.js"))).toBe(false);
+  });
+
+  it("fails naming the flag on an unsupported --engine", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await expect(run([...BASE_FLAGS, "--engine", "gitbook"])).rejects.toThrow(/--engine/);
+  });
+
   it("fails non-interactively naming the missing flag when a required placeholder has no default", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
 

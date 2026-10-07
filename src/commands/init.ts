@@ -9,10 +9,17 @@ import { basename, join } from "node:path";
 import { runCli } from "../core/entrypoint.js";
 import { findRepoRoot } from "../core/pages.js";
 import { detectStack } from "../init/detect-stack.js";
-import { scaffold, type ScaffoldAnswers, type ScaffoldResult } from "../init/scaffold.js";
+import { scaffold, type DocEngine, type ScaffoldAnswers, type ScaffoldResult } from "../init/scaffold.js";
 
 const DEFAULT_LOCALE = "en";
+const DEFAULT_ENGINE: DocEngine = "docusaurus";
 const MANUAL_GATE_COMMANDS = ["make -C wiki lint", "make -C wiki affected-strict"];
+
+function resolveEngine(raw: string | undefined): DocEngine {
+  if (raw === undefined) return DEFAULT_ENGINE;
+  if (raw === "docusaurus" || raw === "mintlify") return raw;
+  throw new Error(`--engine "${raw}" is not supported — only "docusaurus" or "mintlify".`);
+}
 
 export async function run(args: string[]): Promise<void> {
   const { values } = parseArgs({
@@ -27,6 +34,7 @@ export async function run(args: string[]): Promise<void> {
       "tagline-long": { type: "string" },
       "hub-repo": { type: "string" },
       "hub-branch": { type: "string" },
+      engine: { type: "string" },
       force: { type: "boolean", default: false },
     },
     strict: true,
@@ -46,13 +54,14 @@ export async function run(args: string[]): Promise<void> {
     searchLang: values["search-lang"] ?? locale.split("-")[0],
     tagline: values.tagline,
     taglineLong: values["tagline-long"],
+    engine: resolveEngine(values.engine),
     hub: values["hub-repo"] !== undefined
       ? { repo: values["hub-repo"], branch: values["hub-branch"] ?? "main" }
       : null,
   };
 
   const result = await scaffold(repoRoot, scaffoldAnswers, { force: values.force === true });
-  printSummary(result, repoRoot);
+  printSummary(result, repoRoot, scaffoldAnswers.engine);
 }
 
 function reportDetectedStack(repoRoot: string): void {
@@ -64,7 +73,8 @@ function reportDetectedStack(repoRoot: string): void {
   );
 }
 
-function printSummary(result: ScaffoldResult, repoRoot: string): void {
+function printSummary(result: ScaffoldResult, repoRoot: string, engine: DocEngine): void {
+  console.log(`init: doc engine: ${engine}.`);
   if (result.written.length === 0) {
     console.log("init: wiki already up to date — nothing to write.");
   } else {

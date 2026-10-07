@@ -201,7 +201,7 @@ export const RULES = [
     },
     {
         name: "links",
-        describe: "relative links to .md point at pages that exist",
+        describe: "relative links to .md/.mdx point at pages that exist",
         run(pages, ctx) {
             for (const page of pages) {
                 for (const target of relativeLinks(page.body)) {
@@ -241,7 +241,7 @@ function lastCommit(repoRoot, repoRelPath) {
 }
 function relativeLinks(body) {
     const out = [];
-    const re = /\[[^\]]*\]\((\.{1,2}\/[^)\s]+\.md(?:[#?][^)\s]*)?)\)/g;
+    const re = /\[[^\]]*\]\((\.{1,2}\/[^)\s]+\.mdx?(?:[#?][^)\s]*)?)\)/g;
     let m;
     while ((m = re.exec(body)) !== null)
         out.push(m[1]);

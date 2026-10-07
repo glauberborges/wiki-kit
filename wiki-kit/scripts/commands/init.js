@@ -10,7 +10,15 @@ import { findRepoRoot } from "../core/pages.js";
 import { detectStack } from "../init/detect-stack.js";
 import { scaffold } from "../init/scaffold.js";
 const DEFAULT_LOCALE = "en";
+const DEFAULT_ENGINE = "docusaurus";
 const MANUAL_GATE_COMMANDS = ["make -C wiki lint", "make -C wiki affected-strict"];
+function resolveEngine(raw) {
+    if (raw === undefined)
+        return DEFAULT_ENGINE;
+    if (raw === "docusaurus" || raw === "mintlify")
+        return raw;
+    throw new Error(`--engine "${raw}" is not supported — only "docusaurus" or "mintlify".`);
+}
 export async function run(args) {
     const { values } = parseArgs({
         args,
@@ -24,6 +32,7 @@ export async function run(args) {
             "tagline-long": { type: "string" },
             "hub-repo": { type: "string" },
             "hub-branch": { type: "string" },
+            engine: { type: "string" },
             force: { type: "boolean", default: false },
         },
         strict: true,
@@ -41,12 +50,13 @@ export async function run(args) {
         searchLang: values["search-lang"] ?? locale.split("-")[0],
         tagline: values.tagline,
         taglineLong: values["tagline-long"],
+        engine: resolveEngine(values.engine),
         hub: values["hub-repo"] !== undefined
             ? { repo: values["hub-repo"], branch: values["hub-branch"] ?? "main" }
             : null,
     };
     const result = await scaffold(repoRoot, scaffoldAnswers, { force: values.force === true });
-    printSummary(result, repoRoot);
+    printSummary(result, repoRoot, scaffoldAnswers.engine);
 }
 function reportDetectedStack(repoRoot) {
     const stacks = detectStack(repoRoot);
@@ -54,7 +64,8 @@ function reportDetectedStack(repoRoot) {
         ? `init: detected ${stacks.map((s) => `${s.stack} (${s.manifest})`).join(", ")}.`
         : "init: no recognized stack manifest found — proceeding without stack-specific defaults.");
 }
-function printSummary(result, repoRoot) {
+function printSummary(result, repoRoot, engine) {
+    console.log(`init: doc engine: ${engine}.`);
     if (result.written.length === 0) {
         console.log("init: wiki already up to date — nothing to write.");
     }

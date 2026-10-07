@@ -1,0 +1,47 @@
+# Wiki — docs lint.
+#
+# Deliberately self-contained: does NOT depend on the host repo's toolchain, only Node
+# on PATH (the verification scripts were vendored into wiki/.wiki-kit/scripts/ by
+# init — no npm install, no network). That's why this file works the same in a Go,
+# PHP, or Python repo — and why it's a separate workflow, not a job inside the main CI.
+#
+# No build/deploy job here: Mintlify deploys straight from this repo on a push to the
+# default branch (via Mintlify's own GitHub integration) — there's nothing for this CI
+# to build first.
+
+name: wiki
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: wiki-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The staleness gate and `--affected` compare commits: a shallow
+          # clone doesn't have the history for that.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Wiki lint
+        run: make -C wiki lint
+
+      # Gate: code changed and the page declaring it as a source didn't.
+      # PR only — a direct push to main has no base to compare against.
+      - name: Docs in sync with the code
+        if: github.event_name == 'pull_request'
+        # The base is resolved automatically from GITHUB_BASE_REF — the
+        # affected script knows the env vars for GitHub Actions, Jenkins,
+        # GitLab, and Bitbucket, so the same command works in any CI.
+        run: make -C wiki affected-strict

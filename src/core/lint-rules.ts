@@ -223,7 +223,7 @@ export const RULES: LintRule[] = [
   },
   {
     name: "links",
-    describe: "relative links to .md point at pages that exist",
+    describe: "relative links to .md/.mdx point at pages that exist",
     run(pages, ctx) {
       for (const page of pages) {
         for (const target of relativeLinks(page.body)) {
@@ -265,7 +265,7 @@ function lastCommit(repoRoot: string, repoRelPath: string): number | null {
 
 function relativeLinks(body: string): string[] {
   const out: string[] = [];
-  const re = /\[[^\]]*\]\((\.{1,2}\/[^)\s]+\.md(?:[#?][^)\s]*)?)\)/g;
+  const re = /\[[^\]]*\]\((\.{1,2}\/[^)\s]+\.mdx?(?:[#?][^)\s]*)?)\)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(body)) !== null) out.push(m[1]);
   return out;

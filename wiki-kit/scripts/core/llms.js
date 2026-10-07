@@ -7,14 +7,35 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildSourceMap } from "./pages.js";
 /**
- * Title/tagline live in docusaurus.config.js. Reading them by regex avoids
- * importing the config, which would pull in the entire Docusaurus toolchain.
+ * Title/tagline live in the site engine's own config — Docusaurus's
+ * `docusaurus.config.js` or Mintlify's `docs.json`, whichever `init`
+ * scaffolded. Reading Docusaurus's by regex avoids importing the config,
+ * which would pull in the entire Docusaurus toolchain. Mintlify has no
+ * tagline-equivalent field in its minimal schema; the home page's own
+ * `description` (picked up via `describe()` in `renderIndex`) carries that
+ * instead.
  */
 export function siteMeta(wikiDir) {
-    const file = path.join(wikiDir, "docusaurus.config.js");
-    const src = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-    const pick = (key) => new RegExp(`^\\s*${key}:\\s*['"\`](.*?)['"\`]`, "m").exec(src)?.[1] ?? "";
-    return { title: pick("title") || "Wiki", tagline: pick("tagline") };
+    const docusaurusFile = path.join(wikiDir, "docusaurus.config.js");
+    if (fs.existsSync(docusaurusFile)) {
+        const src = fs.readFileSync(docusaurusFile, "utf8");
+        const pick = (key) => new RegExp(`^\\s*${key}:\\s*['"\`](.*?)['"\`]`, "m").exec(src)?.[1] ?? "";
+        return { title: pick("title") || "Wiki", tagline: pick("tagline") };
+    }
+    const mintlifyFile = path.join(wikiDir, "docs.json");
+    if (fs.existsSync(mintlifyFile)) {
+        try {
+            const parsed = JSON.parse(fs.readFileSync(mintlifyFile, "utf8"));
+            if (typeof parsed.name === "string" && parsed.name.trim() !== "") {
+                return { title: parsed.name, tagline: "" };
+            }
+        }
+        catch {
+            // Malformed docs.json isn't this function's problem to diagnose — fall
+            // through to the generic default, same as a missing config entirely.
+        }
+    }
+    return { title: "Wiki", tagline: "" };
 }
 /** First useful sentence of the body — description fallback. */
 export function summarize(body) {
@@ -48,7 +69,7 @@ export function renderIndex(pages, meta) {
         if (d)
             out.push(d, "");
     }
-    out.push("Each page below is a markdown file served alongside the site: swap the extension for `.md` to read the raw content. The full body of everything is in `llms-full.txt`.", "");
+    out.push("Each page below is a markdown/MDX file served alongside the site — open the matching path under `docs/` to read the raw content. The full body of everything is in `llms-full.txt`.", "");
     let currentCategory = null;
     for (const page of pages) {
         if (page.reserved)
@@ -115,6 +136,10 @@ export function renderLog(repoRoot, docsRel, limit = 60) {
 /** The spec allows front matter only on the bundle root's index.md. */
 function writeOkfBundle(okfDir, pages, indexText, logText) {
     fs.rmSync(okfDir, { recursive: true, force: true });
+    // Created unconditionally — a wiki with only the (reserved) index page has
+    // no non-reserved page whose mkdirSync would otherwise create okfDir
+    // as a side effect, and the writeFileSync calls below need it to exist.
+    fs.mkdirSync(okfDir, { recursive: true });
     for (const page of pages) {
         if (page.reserved)
             continue;

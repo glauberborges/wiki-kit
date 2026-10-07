@@ -350,6 +350,30 @@ describe("links", () => {
     const page = makePage({ file, body });
     expect(runRule("links", [page])).toEqual([]);
   });
+
+  it("flags a relative .mdx link that resolves to nothing (Mintlify)", () => {
+    repoRoot = mkdtempSync(join(tmpdir(), "wiki-kit-lint-links-mdx-"));
+    const docsDir = join(repoRoot, "wiki", "docs", "architecture");
+    mkdirSync(docsDir, { recursive: true });
+    const file = join(docsDir, "overview.mdx");
+    const body = "See [missing](../guides/missing.mdx) for details.";
+    writeFileSync(file, body);
+    const page = makePage({ file, body });
+    expect(runRule("links", [page])).toHaveLength(1);
+  });
+
+  it("passes a relative .mdx link that resolves to a real file (Mintlify)", () => {
+    repoRoot = mkdtempSync(join(tmpdir(), "wiki-kit-lint-links-mdx-ok-"));
+    const docsDir = join(repoRoot, "wiki", "docs");
+    mkdirSync(join(docsDir, "architecture"), { recursive: true });
+    mkdirSync(join(docsDir, "guides"), { recursive: true });
+    writeFileSync(join(docsDir, "guides", "quickstart.mdx"), "# Quickstart");
+    const file = join(docsDir, "architecture", "overview.mdx");
+    const body = "See [quickstart](../guides/quickstart.mdx) for details.";
+    writeFileSync(file, body);
+    const page = makePage({ file, body });
+    expect(runRule("links", [page])).toEqual([]);
+  });
 });
 
 describe("runLintRules", () => {

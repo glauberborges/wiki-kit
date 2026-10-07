@@ -61,7 +61,7 @@ function makeEntry(repoRoot, absPath, content) {
 function buildPlan(repoRoot, answers, ci) {
     const assetsRoot = resolvePackageDir("assets");
     const entries = [];
-    const wikiAssetRoot = join(assetsRoot, "wiki");
+    const wikiAssetRoot = join(assetsRoot, `wiki-${answers.engine}`);
     for (const absSrc of walkFiles(wikiAssetRoot)) {
         const rel = relative(wikiAssetRoot, absSrc);
         const absTarget = join(repoRoot, "wiki", rel);
@@ -69,12 +69,15 @@ function buildPlan(repoRoot, answers, ci) {
     }
     const agentSrc = join(assetsRoot, "claude", "agents", "wiki.md");
     entries.push(makeEntry(repoRoot, join(repoRoot, ".claude", "agents", "wiki.md"), renderFile(agentSrc, answers)));
+    // Target filenames stay the same regardless of engine (.github/workflows/wiki.yml,
+    // Jenkinsfile.wiki) — only the source template differs, same as the wiki-<engine>
+    // asset tree above.
     if (ci === "github") {
-        const src = join(assetsRoot, "github", "wiki.yml");
+        const src = join(assetsRoot, "github", `wiki-${answers.engine}.yml`);
         entries.push(makeEntry(repoRoot, join(repoRoot, ".github", "workflows", "wiki.yml"), renderFile(src, answers)));
     }
     else if (ci === "jenkins") {
-        const src = join(assetsRoot, "jenkins", "Jenkinsfile.wiki");
+        const src = join(assetsRoot, "jenkins", `Jenkinsfile.${answers.engine}.wiki`);
         entries.push(makeEntry(repoRoot, join(repoRoot, "Jenkinsfile.wiki"), renderFile(src, answers)));
     }
     entries.push(...collectScriptEntries(repoRoot));
