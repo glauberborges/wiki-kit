@@ -65,7 +65,7 @@ function findViolations(): Violation[] {
 }
 
 describe("language gate", () => {
-  it("finds zero Portuguese residue in src/, templates/, and SKILL.md", () => {
+  it("finds zero Portuguese residue in src/, wiki-kit/assets/, and wiki-kit/SKILL.md", () => {
     const violations = findViolations();
 
     if (violations.length > 0) {
